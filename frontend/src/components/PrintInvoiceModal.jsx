@@ -130,7 +130,7 @@ Bayar online (QRIS / VA / e-wallet):
 ${snapUrl || "Hubungi admin untuk link pembayaran"}
 
 Mohon konfirmasi setelah pembayaran.
-Terima kasih atas kerjasamanya \u{1F64F}`;
+Terima kasih atas kerjasamanya.`;
     }
 
     // Default: Transfer Bank BCA template
@@ -148,7 +148,7 @@ Rekening pembayaran sewa kendaraan :
 - BCA 1663308151 a.n PT. LUAR JENDELA CREATRIP, Atau
 - BCA 6280564492 a.n SULTON AZIZ
 
-Mohon konfirmasi setelah pembayaran. Terima kasih atas kerjasamanya \u{1F64F}`;
+Mohon konfirmasi setelah pembayaran. Terima kasih atas kerjasamanya.`;
   };
 
   const handleSendWa = async (mode) => {

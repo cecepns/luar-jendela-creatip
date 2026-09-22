@@ -99,7 +99,7 @@ Untuk Pembayaran: ${forPayment}
 Total Nominal: ${amountStr} (LUNAS)
 Metode: ${methodStr}
 
-Terima kasih atas kerjasamanya \u{1F64F}`;
+Terima kasih atas kerjasamanya.`;
 
     let phone = receipt.client_phone ? receipt.client_phone.replace(/[^0-9]/g, "") : "";
     if (phone.startsWith("0")) phone = "62" + phone.slice(1);
