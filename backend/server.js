@@ -64,13 +64,11 @@ const upload = multer({
   }
 });
 
-// Midtrans Direct API Configuration (Zero external module/SDK required)
-const MIDTRANS_IS_PRODUCTION = process.env.MIDTRANS_IS_PRODUCTION === 'true';
-const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY || '';
-const MIDTRANS_CLIENT_KEY = process.env.MIDTRANS_CLIENT_KEY || 'Mid-client-6HecmVRfVhMyOC_S';
-const MIDTRANS_SNAP_URL = MIDTRANS_IS_PRODUCTION
-  ? 'https://app.midtrans.com/snap/v1/transactions'
-  : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
+// Midtrans Direct API Configuration (Strict Live Production)
+const MIDTRANS_SERVER_KEY = (process.env.MIDTRANS_SERVER_KEY || '').trim();
+const MIDTRANS_CLIENT_KEY = (process.env.MIDTRANS_CLIENT_KEY || '').trim();
+const MIDTRANS_MERCHANT_ID = (process.env.MIDTRANS_MERCHANT_ID || '').trim();
+const MIDTRANS_SNAP_URL = 'https://app.midtrans.com/snap/v1/transactions';
 
 // Helper: Convert Number to Indonesian Words (Terbilang)
 function terbilang(n) {
@@ -878,7 +876,7 @@ app.post('/api/invoices/:id/midtrans-token', async (req, res) => {
       success: true,
       token: snapTransaction.token,
       redirect_url: snapTransaction.redirect_url,
-      clientKey: process.env.MIDTRANS_CLIENT_KEY || 'Mid-client-6HecmVRfVhMyOC_S'
+      clientKey: MIDTRANS_CLIENT_KEY
     });
   } catch (error) {
     console.error('Error creating midtrans token:', error);

@@ -128,6 +128,19 @@ export default function InvoiceKwitansiPage() {
         return;
       }
 
+      // Ensure Midtrans Snap script is loaded (Live Production)
+      if (!window.snap) {
+        await new Promise((resolve) => {
+          const script = document.createElement("script");
+          script.src = "https://app.midtrans.com/snap/snap.js";
+          script.setAttribute("data-client-key", res.clientKey || "Mid-client-6HecmVRfVhMyOC_S");
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => resolve();
+          document.body.appendChild(script);
+        });
+      }
+
       if (window.snap) {
         window.snap.pay(res.token, {
           onSuccess: async function (result) {

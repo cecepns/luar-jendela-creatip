@@ -1,10 +1,10 @@
-import React, { useState, useRef } from "react";
-import html2pdf from "html2pdf.js";
+import React, { useState, useRef, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Download, CreditCard, ShieldCheck, Loader2 } from "lucide-react";
+import { Download, CreditCard, Loader2, ZoomIn, ZoomOut, CheckCircle2 } from "lucide-react";
 import Modal from "./Modal";
 import logoImg from "@/assets/logo.png";
 import { formatRupiah, formatTanggal, terbilang } from "@/utils/formatters";
+import { exportElementToPdf } from "@/utils/pdfGenerator";
 
 export default function PrintInvoiceModal({
   isOpen,
@@ -14,45 +14,33 @@ export default function PrintInvoiceModal({
   onPayMidtrans,
 }) {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [zoomMode, setZoomMode] = useState("fit"); // "fit" or "original"
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  const containerRef = useRef(null);
   const printAreaRef = useRef(null);
 
+  // Monitor container width for responsive scaling on mobile
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const measureWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+
+    measureWidth();
+    const timer = setTimeout(measureWidth, 100);
+    window.addEventListener("resize", measureWidth);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", measureWidth);
+    };
+  }, [isOpen]);
+
   if (!invoice) return null;
-
-  const handleDownloadPdf = async () => {
-    if (!printAreaRef.current) return;
-    setIsGeneratingPdf(true);
-    toast.loading("Sedang membuat file PDF...", { id: "pdf-toast" });
-
-    try {
-      const element = printAreaRef.current;
-      const cleanFileName = `Invoice_${invoice.invoice_number.replace(/[\/\\]/g, "-")}.pdf`;
-
-      const opt = {
-        margin: [8, 8, 8, 8],
-        filename: cleanFileName,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          scrollY: 0,
-          scrollX: 0,
-          windowWidth: 794,
-          letterRendering: true,
-        },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      };
-
-      await html2pdf().set(opt).from(element).save();
-      toast.success("File PDF Invoice berhasil diunduh!", { id: "pdf-toast" });
-    } catch (err) {
-      console.error("PDF generation error:", err);
-      toast.error("Gagal membuat file PDF. Silakan coba lagi.", { id: "pdf-toast" });
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  };
 
   const isPaid = invoice.payment_status === "LUNAS";
   const subtotal = Number(invoice.subtotal) || 0;
@@ -63,13 +51,45 @@ export default function PrintInvoiceModal({
   const terbilangText = terbilang(paidAmount > 0 && !isPaid ? paidAmount : totalAmount);
   const dpPercent = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
 
+  // Invoice canvas dimensions
+  const CANVAS_WIDTH = 690;
+  const CANVAS_HEIGHT = 980;
+
+  // Calculate scale factor for mobile preview
+  const isMobile = containerWidth > 0 && containerWidth < CANVAS_WIDTH + 32;
+  const fitScale = isMobile
+    ? Math.min(1, Math.max(0.38, (containerWidth - 24) / CANVAS_WIDTH))
+    : 1;
+  const currentScale = zoomMode === "fit" && isMobile ? fitScale : 1;
+
+  const handleDownloadPdf = async () => {
+    if (!printAreaRef.current) return;
+    setIsGeneratingPdf(true);
+    const toastId = toast.loading("Sedang menyusun file PDF Invoice...");
+
+    try {
+      const cleanFileName = `Invoice_${invoice.invoice_number.replace(/[\/\\]/g, "-")}.pdf`;
+      await exportElementToPdf(printAreaRef.current, cleanFileName, {
+        orientation: "portrait",
+        margin: 6,
+        centerVertical: false,
+      });
+      toast.success("File PDF Invoice berhasil diunduh!", { id: toastId });
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Gagal membuat file PDF. Silakan coba lagi.", { id: toastId });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Invoice Resmi Luar Jendela Creatrip" maxWidth="max-w-4xl">
       <div className="space-y-4">
-        {/* Action Controls */}
+        {/* Action Controls Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-500 font-medium">Status:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 font-medium">Status:</span>
             <span
               className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[11px] ${
                 isPaid
@@ -81,15 +101,37 @@ export default function PrintInvoiceModal({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Zoom Toggle on Mobile */}
+            {isMobile && (
+              <button
+                type="button"
+                onClick={() => setZoomMode((prev) => (prev === "fit" ? "original" : "fit"))}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shadow-sm transition-colors"
+                title={zoomMode === "fit" ? "Perbesar ke 100%" : "Pas ke ukuran layar"}
+              >
+                {zoomMode === "fit" ? (
+                  <>
+                    <ZoomIn className="w-3.5 h-3.5 text-brand-600" />
+                    <span>Zoom 100%</span>
+                  </>
+                ) : (
+                  <>
+                    <ZoomOut className="w-3.5 h-3.5 text-brand-600" />
+                    <span>Pas Layar</span>
+                  </>
+                )}
+              </button>
+            )}
+
             {!isPaid && onPayMidtrans && (
               <button
                 type="button"
                 onClick={() => onPayMidtrans(invoice)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
               >
                 <CreditCard className="w-4 h-4" />
-                Bayar via Midtrans
+                <span>Bayar Midtrans</span>
               </button>
             )}
 
@@ -114,401 +156,466 @@ export default function PrintInvoiceModal({
           </div>
         </div>
 
-        {/* INVOICE CANVAS */}
-        <div className="overflow-x-auto bg-slate-100 p-2 sm:p-4 rounded-xl flex justify-center">
+        {/* Mobile hint if in 100% mode */}
+        {isMobile && zoomMode === "original" && (
+          <div className="text-center text-[11px] text-slate-500 bg-amber-50 border border-amber-200 py-1.5 px-3 rounded-lg">
+            👉 Geser ke kanan & kiri untuk melihat seluruh dokumen.
+          </div>
+        )}
+
+        {/* INVOICE PREVIEW CONTAINER */}
+        <div
+          ref={containerRef}
+          className={`bg-slate-200/80 p-2 sm:p-4 rounded-xl transition-all ${
+            zoomMode === "original" ? "overflow-x-auto" : "overflow-hidden"
+          }`}
+          style={{ minHeight: isMobile && zoomMode === "fit" ? `${CANVAS_HEIGHT * currentScale + 24}px` : "auto" }}
+        >
           <div
-            ref={printAreaRef}
+            className="flex justify-center"
             style={{
-              width: "690px",
-              minHeight: "980px",
-              backgroundColor: "#ffffff",
-              padding: "20px 24px",
-              boxSizing: "border-box",
-              color: "#000000",
-              fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-              fontSize: "11px",
-              lineHeight: "1.35",
+              width: zoomMode === "original" && isMobile ? `${CANVAS_WIDTH}px` : "100%",
+              margin: "0 auto",
             }}
           >
-            {/* ===== HEADER TABLE ===== */}
-            <table style={{ width: "100%", borderCollapse: "collapse", borderBottom: "2px solid #000000", paddingBottom: "8px", marginBottom: "10px" }}>
-              <tbody>
-                <tr>
-                  {/* Logo - use max-width/max-height instead of object-fit for html2canvas */}
-                  <td style={{ width: "85px", verticalAlign: "middle", textAlign: "center" }}>
-                    <img
-                      src={logoImg}
-                      alt="Logo"
+            <div
+              ref={printAreaRef}
+              style={{
+                width: `${CANVAS_WIDTH}px`,
+                minHeight: `${CANVAS_HEIGHT}px`,
+                backgroundColor: "#ffffff",
+                padding: "24px 28px",
+                boxSizing: "border-box",
+                color: "#0f172a",
+                fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                fontSize: "11px",
+                lineHeight: "1.4",
+                transform: currentScale !== 1 ? `scale(${currentScale})` : "none",
+                transformOrigin: "top center",
+                boxShadow: "0 4px 20px -2px rgba(0, 0, 0, 0.15)",
+                borderRadius: "2px",
+              }}
+            >
+              {/* ===== 1. HEADER PERUSAHAAN ===== */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                {/* Logo */}
+                <div style={{ width: "80px", flexShrink: 0 }}>
+                  <img
+                    src={logoImg}
+                    alt="Logo"
+                    style={{
+                      width: "75px",
+                      height: "auto",
+                      maxHeight: "75px",
+                      display: "block",
+                    }}
+                  />
+                </div>
+
+                {/* Company Info */}
+                <div style={{ flex: 1, textAlign: "center", padding: "0 12px" }}>
+                  <div
+                    style={{
+                      fontSize: "19px",
+                      fontWeight: "900",
+                      letterSpacing: "0.5px",
+                      textTransform: "uppercase",
+                      color: "#0f172a",
+                      lineHeight: "1.2",
+                    }}
+                  >
+                    {companyProfile?.company_name || "LUAR JENDELA CREATRIP"}
+                  </div>
+                  {/* Clean line divider under title (no span border overlap bug) */}
+                  <div
+                    style={{
+                      height: "2px",
+                      width: "170px",
+                      backgroundColor: "#0f172a",
+                      margin: "5px auto 6px auto",
+                    }}
+                  />
+                  <div style={{ fontSize: "9.5px", color: "#334155", fontWeight: "500", lineHeight: "1.35" }}>
+                    {companyProfile?.address || "Jalan Puskesmas Setu RT 4/3 No. 34 Setu, Cipayung, Jakarta Timur 13880"}
+                  </div>
+                  <div style={{ fontSize: "9.5px", color: "#334155", marginTop: "3px" }}>
+                    HP. {companyProfile?.phone || "0856 934 999 15"} &nbsp;•&nbsp; Email : {companyProfile?.email || "Luarjendela.cr@gmail.com"}
+                  </div>
+                </div>
+
+                {/* Green INVOICE Badge */}
+                <div style={{ width: "135px", flexShrink: 0, textAlign: "right" }}>
+                  <div
+                    style={{
+                      backgroundColor: "#15803d",
+                      color: "#fde047",
+                      fontWeight: "900",
+                      fontSize: "20px",
+                      letterSpacing: "3px",
+                      textAlign: "center",
+                      padding: "10px 6px",
+                      borderRadius: "4px",
+                      textTransform: "uppercase",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
+                    }}
+                  >
+                    INVOICE
+                  </div>
+                </div>
+              </div>
+
+              {/* Header Separator Divider Line */}
+              <div
+                style={{
+                  height: "2px",
+                  backgroundColor: "#0f172a",
+                  marginTop: "12px",
+                  marginBottom: "12px",
+                }}
+              />
+
+              {/* ===== 2. BILL TO & INVOICE META ===== */}
+              <div
+                style={{
+                  display: "flex",
+                  border: "1px solid #64748b",
+                  borderRadius: "2px",
+                  marginBottom: "12px",
+                  overflow: "hidden",
+                }}
+              >
+                {/* Left: Bill To */}
+                <div
+                  style={{
+                    flex: "1 1 54%",
+                    padding: "8px 12px",
+                    borderRight: "1px solid #64748b",
+                    backgroundColor: "#ffffff",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                    <span style={{ fontStyle: "italic", fontWeight: "bold", color: "#475569", width: "65px", flexShrink: 0, fontSize: "11px" }}>
+                      BILL TO
+                    </span>
+                    <span style={{ fontWeight: "800", color: "#0f172a", textTransform: "uppercase", fontSize: "12px" }}>
+                      : {invoice.client_name || "-"}
+                    </span>
+                  </div>
+                  {invoice.client_address && (
+                    <div style={{ paddingLeft: "71px", fontSize: "9.5px", color: "#475569", marginTop: "2px" }}>
+                      {invoice.client_address}
+                    </div>
+                  )}
+                  {invoice.client_phone && (
+                    <div style={{ paddingLeft: "71px", fontSize: "9.5px", color: "#475569", marginTop: "2px" }}>
+                      Telp: {invoice.client_phone}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Meta (Invoice No, Date, Due Date) */}
+                <div
+                  style={{
+                    flex: "1 1 46%",
+                    padding: "8px 12px",
+                    backgroundColor: "#f8fafc",
+                    fontSize: "10.5px",
+                  }}
+                >
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ fontStyle: "italic", fontWeight: "bold", color: "#475569", width: "95px", padding: "1px 0" }}>
+                          INVOICE NO.
+                        </td>
+                        <td style={{ fontWeight: "bold", fontFamily: "monospace", textAlign: "right", color: "#0f172a" }}>
+                          : {invoice.invoice_number}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontStyle: "italic", fontWeight: "bold", color: "#475569", padding: "1px 0" }}>
+                          DATE
+                        </td>
+                        <td style={{ textAlign: "right", color: "#0f172a" }}>
+                          : {formatTanggal(invoice.invoice_date)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontStyle: "italic", fontWeight: "bold", color: "#475569", padding: "1px 0" }}>
+                          DUE DATE
+                        </td>
+                        <td style={{ textAlign: "right", color: "#0f172a", fontWeight: "600" }}>
+                          : {formatTanggal(invoice.due_date)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ===== 3. ITEMS TABLE ===== */}
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  border: "1px solid #64748b",
+                  marginBottom: "0px",
+                }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: "#15803d", color: "#ffffff", fontSize: "10.5px", fontWeight: "bold" }}>
+                    <th style={{ width: "6%", padding: "7px 4px", textAlign: "center", borderRight: "1px solid #166534" }}>
+                      NO.
+                    </th>
+                    <th style={{ width: "50%", padding: "7px 10px", textAlign: "left", borderRight: "1px solid #166534" }}>
+                      DESKRIPSI
+                    </th>
+                    <th style={{ width: "8%", padding: "7px 4px", textAlign: "center", borderRight: "1px solid #166534" }}>
+                      QTY
+                    </th>
+                    <th style={{ width: "18%", padding: "7px 8px", textAlign: "right", borderRight: "1px solid #166534" }}>
+                      HARGA SATUAN (IDR)
+                    </th>
+                    <th style={{ width: "18%", padding: "7px 8px", textAlign: "right" }}>
+                      JUMLAH (IDR)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ minHeight: "70px", verticalAlign: "top", fontSize: "11px", backgroundColor: "#ffffff" }}>
+                    <td style={{ textAlign: "center", padding: "10px 4px", borderRight: "1px solid #64748b", borderBottom: "1px solid #64748b" }}>
+                      1.
+                    </td>
+                    <td style={{ padding: "10px 10px", borderRight: "1px solid #64748b", borderBottom: "1px solid #64748b" }}>
+                      <div style={{ fontWeight: "bold", color: "#0f172a" }}>
+                        Sewa Armada ({invoice.destination || "Perjalanan Wisata"})
+                      </div>
+                      <div style={{ fontSize: "9.5px", color: "#475569", marginTop: "3px" }}>
+                        Tanggal Pemakaian: {formatTanggal(invoice.usage_date || invoice.due_date)}
+                      </div>
+                      <div style={{ fontSize: "9.5px", color: "#475569" }}>
+                        Tujuan: {invoice.destination || "-"}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: "center", padding: "10px 4px", borderRight: "1px solid #64748b", borderBottom: "1px solid #64748b", fontWeight: "600" }}>
+                      1
+                    </td>
+                    <td style={{ textAlign: "right", padding: "10px 8px", fontFamily: "monospace", borderRight: "1px solid #64748b", borderBottom: "1px solid #64748b", color: "#0f172a" }}>
+                      {formatRupiah(subtotal)}
+                    </td>
+                    <td style={{ textAlign: "right", padding: "10px 8px", fontFamily: "monospace", fontWeight: "bold", borderBottom: "1px solid #64748b", color: "#0f172a" }}>
+                      {formatRupiah(subtotal)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* ===== 4. TOTALS & SAY ROW (Yellow Box) ===== */}
+              <div
+                style={{
+                  display: "flex",
+                  backgroundColor: "#f59e0b",
+                  border: "1px solid #d97706",
+                  borderTop: "none",
+                  color: "#0f172a",
+                  marginBottom: "12px",
+                  boxSizing: "border-box",
+                }}
+              >
+                {/* Left: Terbilang (Say) */}
+                <div
+                  style={{
+                    flex: "1 1 64%",
+                    padding: "10px 12px",
+                    borderRight: "1px solid #d97706",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <span style={{ fontWeight: "900", fontSize: "11px", marginRight: "6px" }}>Say :</span>
+                    <span style={{ fontStyle: "italic", fontWeight: "bold", fontSize: "11px", lineHeight: "1.3" }}>
+                      {terbilangText}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right: Calculations (Total, DP, Sisa) */}
+                <div style={{ flex: "1 1 36%", padding: "8px 12px", fontSize: "10.5px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
+                    <span style={{ fontStyle: "italic", fontWeight: "bold" }}>Total Harga</span>
+                    <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>{formatRupiah(totalAmount)}</span>
+                  </div>
+                  {paidAmount > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
+                      <span style={{ fontStyle: "italic", fontWeight: "bold" }}>Down Payment {dpPercent}%</span>
+                      <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>{formatRupiah(paidAmount)}</span>
+                    </div>
+                  )}
+                  {sisa > 0 && (
+                    <div
                       style={{
-                        maxWidth: "75px",
-                        maxHeight: "75px",
-                        width: "auto",
-                        height: "auto",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        borderTop: "1px solid #b45309",
+                        paddingTop: "4px",
+                        marginTop: "3px",
+                        color: "#78350f",
+                      }}
+                    >
+                      <span style={{ fontStyle: "italic", fontWeight: "bold" }}>Sisa Pelunasan</span>
+                      <span style={{ fontFamily: "monospace", fontWeight: "bold" }}>{formatRupiah(sisa)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ===== 5. INFORMASI PEMBAYARAN ===== */}
+              <div
+                style={{
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "2px",
+                  padding: "7px 12px",
+                  backgroundColor: "#f8fafc",
+                  fontSize: "9.5px",
+                  marginBottom: "10px",
+                }}
+              >
+                <div style={{ fontWeight: "bold", color: "#0f172a", marginBottom: "4px", fontSize: "10px" }}>
+                  Informasi Pembayaran :
+                </div>
+                <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ width: "120px", color: "#475569", padding: "1px 0" }}>Nama Penerima</td>
+                      <td style={{ fontWeight: "bold", color: "#0f172a" }}>: {companyProfile?.bank_account_holder || "LUAR JENDELA CREATRIP"}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ color: "#475569", padding: "1px 0" }}>Bank</td>
+                      <td style={{ fontWeight: "bold", color: "#0f172a" }}>: {companyProfile?.bank_name || "Bank Central Asia (BCA)"}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ color: "#475569", padding: "1px 0" }}>Nomor Rekening</td>
+                      <td style={{ fontWeight: "bold", fontFamily: "monospace", color: "#0f172a" }}>: {companyProfile?.bank_account_no || "166 330 8151"}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ===== 6. SYARAT & KETENTUAN (15 Points) ===== */}
+              <div
+                style={{
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "2px",
+                  padding: "7px 12px",
+                  fontSize: "8.5px",
+                  lineHeight: "1.35",
+                  marginBottom: "12px",
+                }}
+              >
+                <div style={{ fontWeight: "bold", color: "#0f172a", marginBottom: "4px" }}>
+                  Syarat & Ketentuan :
+                </div>
+                <table style={{ borderCollapse: "collapse", width: "100%", color: "#334155" }}>
+                  <tbody>
+                    <tr><td style={{ width: "18px", verticalAlign: "top" }}>1.</td><td>Harga SUDAH TERMASUK biaya bahan bakar dan jasa supir</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>2.</td><td>Harga BELUM TERMASUK biaya tol, parkir, makan crew, retribusi jalan, akomodasi/penginapan kru bus (bila menginap), TIP pengemudi</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>3.</td><td>Pemesanan baru DIANGGAP SAH apabila sudah melakukan pembayaran uang muka, pembayaran uang muka minimum 50% dari total</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>4.</td><td>Pembayaran sewa harus lunas 3 hari sebelum keberangkatan</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>5.</td><td>Uang sewa / DP tidak dapat dikembalikan apabila terjadi pembatalan (hangus)</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>6.</td><td>Pembatalan 3 hari sebelum keberangkatan dikenakan cancelation fee 100% dari harga</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>7.</td><td>Kehilangan barang / tertukar di dalam bus bukan tanggung jawab pengelola bus dan kru</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>8.</td><td>Pengemudi berhak menolak jalan yang tidak memadai / dilarang petugas / membahayakan</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>9.</td><td>Perhitungan penggunaan bus 1 hari = Pukul 05.00 s/d Pukul 23.00</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>10.</td><td>Batas Pemakaian Bus (Dalam Kota) maksimum 12 Jam terhitung mulai dari jam penjemputan</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>11.</td><td>Batas Pemakaian Bus (Luar Kota) paling pagi pukul 05.00 sampai maksimum pukul 23.00</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>12.</td><td>Pemakaian melebihi 12 Jam (Dalam Kota) dan atau Melebihi pukul 23.00 (Luar Kota) dikenakan overtime charge</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>13.</td><td>Penyewa harus bertanggung jawab apabila merusak kendaraan / bus</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>14.</td><td>Penjemputan untuk area dalam kota Jakarta GRATIS</td></tr>
+                    <tr><td style={{ verticalAlign: "top" }}>15.</td><td>Penjemputan diluar area Jakarta yang tidak searah dikenakan charge sesuai jarak penjemputan.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ===== 7. SIGNATURE & QR FOOTER ===== */}
+              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: "14px" }}>
+                {/* Left: QR Code Verification */}
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  {invoice.qr_signature ? (
+                    <img
+                      src={invoice.qr_signature}
+                      alt="QR Verification"
+                      style={{
+                        width: "56px",
+                        height: "56px",
+                        border: "1px solid #cbd5e1",
+                        padding: "2px",
+                        backgroundColor: "#ffffff",
                         display: "block",
                       }}
                     />
-                  </td>
-
-                  {/* Company Info - use table-based centering for html2canvas compatibility */}
-                  <td style={{ textAlign: "center", verticalAlign: "middle", padding: "0 10px" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                      <tbody>
-                        <tr>
-                          <td style={{ textAlign: "center" }}>
-                            <span style={{
-                              fontSize: "19px",
-                              fontWeight: "900",
-                              letterSpacing: "0.5px",
-                              textTransform: "uppercase",
-                              borderBottom: "2px solid #000000",
-                              paddingBottom: "2px",
-                            }}>
-                              {companyProfile?.company_name || "LUAR JENDELA CREATRIP."}
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{ textAlign: "center", fontSize: "9.5px", color: "#333333", fontWeight: "500", paddingTop: "4px" }}>
-                            {companyProfile?.address || "Jalan Puskesmas Setu RT 4/3 No. 34 Setu, Cipayung, Jakarta Timur 13880"}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{ textAlign: "center", fontSize: "9.5px", color: "#333333" }}>
-                            HP. {companyProfile?.phone || "0856 934 999 15"} &nbsp;•&nbsp; Email : {companyProfile?.email || "Luarjendela.cr@gmail.com"}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-
-                  {/* INVOICE Green Box */}
-                  <td style={{ width: "145px", verticalAlign: "middle", textAlign: "right" }}>
+                  ) : (
                     <div
                       style={{
-                        backgroundColor: "#1b7a43",
-                        color: "#ffd700",
-                        fontWeight: "900",
-                        fontSize: "22px",
-                        letterSpacing: "3px",
-                        textAlign: "center",
-                        padding: "12px 6px",
-                        borderRadius: "2px",
-                        textTransform: "uppercase",
+                        width: "56px",
+                        height: "56px",
+                        border: "1px dashed #cbd5e1",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "8px",
+                        color: "#94a3b8",
                       }}
                     >
-                      INVOICE
+                      QR Code
                     </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            {/* ===== BILL TO & INVOICE META ===== */}
-            <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #718096", marginBottom: "0px" }}>
-              <tbody>
-                <tr>
-                  {/* Left: Bill To */}
-                  <td style={{ width: "54%", borderRight: "1px solid #718096", padding: "6px 8px", verticalAlign: "top" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                      <tbody>
-                        <tr>
-                          <td style={{ width: "65px", fontStyle: "italic", fontWeight: "bold", color: "#4a5568", verticalAlign: "top" }}>
-                            BILL TO
-                          </td>
-                          <td style={{ fontWeight: "800", color: "#000000", textTransform: "uppercase", fontSize: "11px" }}>
-                            : {invoice.client_name || "-"}
-                          </td>
-                        </tr>
-                        {invoice.client_address && (
-                          <tr>
-                            <td></td>
-                            <td style={{ fontSize: "9.5px", color: "#4a5568", paddingTop: "2px" }}>
-                              {invoice.client_address}
-                            </td>
-                          </tr>
-                        )}
-                        {invoice.client_phone && (
-                          <tr>
-                            <td></td>
-                            <td style={{ fontSize: "9.5px", color: "#4a5568" }}>
-                              Telp: {invoice.client_phone}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </td>
-
-                  {/* Right: Meta (Invoice No, Date, Due Date) */}
-                  <td style={{ width: "46%", padding: "6px 8px", verticalAlign: "top" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10.5px" }}>
-                      <tbody>
-                        <tr>
-                          <td style={{ fontStyle: "italic", fontWeight: "bold", color: "#4a5568", width: "95px" }}>
-                            INVOICE NO.
-                          </td>
-                          <td style={{ fontWeight: "bold", fontFamily: "monospace", textAlign: "right", whiteSpace: "nowrap" }}>
-                            : {invoice.invoice_number}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{ fontStyle: "italic", fontWeight: "bold", color: "#4a5568" }}>
-                            DATE
-                          </td>
-                          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                            : {formatTanggal(invoice.invoice_date)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{ fontStyle: "italic", fontWeight: "bold", color: "#4a5568" }}>
-                            DUE DATE
-                          </td>
-                          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                            : {formatTanggal(invoice.due_date)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            {/* ===== CURRENCY SEPARATOR BAR ===== */}
-            <table style={{ width: "100%", borderCollapse: "collapse", borderLeft: "1px solid #718096", borderRight: "1px solid #718096", backgroundColor: "#f7fafc", textAlign: "center", fontSize: "9.5px", fontWeight: "bold" }}>
-              <tbody>
-                <tr>
-                  <td style={{ width: "25%", padding: "2px" }}>-</td>
-                  <td style={{ width: "35%", padding: "2px" }}>-</td>
-                  <td style={{ width: "20%", padding: "2px", fontWeight: "900", letterSpacing: "1px" }}>IDR</td>
-                  <td style={{ width: "20%", padding: "2px" }}>-</td>
-                </tr>
-              </tbody>
-            </table>
-
-            {/* ===== ITEMS TABLE ===== */}
-            <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #718096", borderTop: "2px solid #145a32" }}>
-              <thead>
-                <tr style={{ backgroundColor: "#145a32", color: "#ffffff", fontSize: "10px", fontWeight: "bold", letterSpacing: "0.5px" }}>
-                  <th style={{ width: "6%", padding: "5px 4px", textAlign: "center", borderRight: "1px solid #48bb78" }}>NO.</th>
-                  <th style={{ width: "52%", padding: "5px 8px", textAlign: "left", borderRight: "1px solid #48bb78" }}>DESKRIPSI</th>
-                  <th style={{ width: "8%", padding: "5px 4px", textAlign: "center", borderRight: "1px solid #48bb78" }}>QTY</th>
-                  <th style={{ width: "17%", padding: "5px 6px", textAlign: "right", borderRight: "1px solid #48bb78" }}>HARGA SATUAN</th>
-                  <th style={{ width: "17%", padding: "5px 6px", textAlign: "right" }}>JUMLAH</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ minHeight: "65px", verticalAlign: "top", fontSize: "10.5px" }}>
-                  <td style={{ textAlign: "center", padding: "8px 4px", borderRight: "1px solid #718096", borderBottom: "1px solid #718096" }}>
-                    1.
-                  </td>
-                  <td style={{ padding: "8px 8px", borderRight: "1px solid #718096", borderBottom: "1px solid #718096" }}>
-                    <div style={{ fontWeight: "bold", color: "#000000" }}>
-                      Sewa Armada ({invoice.destination || "Perjalanan Wisata"})
+                  )}
+                  <div style={{ fontSize: "9px", color: "#64748b" }}>
+                    <div style={{ color: "#166534", fontWeight: "bold", display: "flex", alignItems: "center", gap: "3px" }}>
+                      <CheckCircle2 style={{ width: "12px", height: "12px", display: "inline" }} />
+                      <span>Terverifikasi Resmi</span>
                     </div>
-                    <div style={{ fontSize: "9.5px", color: "#4a5568", marginTop: "2px" }}>
-                      Tanggal: {formatTanggal(invoice.usage_date || invoice.due_date)}
-                    </div>
-                    <div style={{ fontSize: "9.5px", color: "#4a5568" }}>
-                      Tujuan: {invoice.destination || "-"}
-                    </div>
-                  </td>
-                  <td style={{ textAlign: "center", padding: "8px 4px", borderRight: "1px solid #718096", borderBottom: "1px solid #718096" }}>
-                    1
-                  </td>
-                  <td style={{ textAlign: "right", padding: "8px 6px", fontFamily: "monospace", borderRight: "1px solid #718096", borderBottom: "1px solid #718096" }}>
-                    {formatRupiah(subtotal)}
-                  </td>
-                  <td style={{ textAlign: "right", padding: "8px 6px", fontFamily: "monospace", fontWeight: "bold", borderBottom: "1px solid #718096" }}>
-                    {formatRupiah(subtotal)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    <div style={{ marginTop: "2px" }}>Scan QR untuk cek keaslian dokumen</div>
+                  </div>
+                </div>
 
-            {/* ===== TOTALS & SAY ROW (Yellow) ===== */}
-            <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #718096", borderTop: "none", backgroundColor: "#ffb703" }}>
-              <tbody>
-                <tr>
-                  {/* Left: Say (Terbilang) */}
-                  <td style={{ width: "66%", padding: "8px 10px", borderRight: "1px solid #718096", verticalAlign: "middle" }}>
-                    <span style={{ fontWeight: "900", color: "#000000", fontSize: "11px", marginRight: "6px" }}>Say :</span>
-                    <span style={{ fontStyle: "italic", fontWeight: "bold", color: "#000000", fontSize: "11px" }}>
-                      {terbilangText}
-                    </span>
-                  </td>
-
-                  {/* Right: Calculations */}
-                  <td style={{ width: "34%", padding: "6px 8px", verticalAlign: "middle", fontSize: "10.5px" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                      <tbody>
-                        <tr>
-                          <td style={{ fontStyle: "italic", fontWeight: "bold", color: "#000000" }}>Total Harga</td>
-                          <td style={{ textAlign: "right", fontFamily: "monospace", fontWeight: "bold", color: "#000000" }}>
-                            {formatRupiah(totalAmount)}
-                          </td>
-                        </tr>
-                        {paidAmount > 0 && (
-                          <tr>
-                            <td style={{ fontStyle: "italic", fontWeight: "bold", color: "#000000", paddingTop: "2px" }}>
-                              Down Payment {dpPercent}%
-                            </td>
-                            <td style={{ textAlign: "right", fontFamily: "monospace", fontWeight: "bold", color: "#000000", paddingTop: "2px" }}>
-                              {formatRupiah(paidAmount)}
-                            </td>
-                          </tr>
-                        )}
-                        {sisa > 0 && (
-                          <tr style={{ borderTop: "1px solid #d97706" }}>
-                            <td style={{ fontStyle: "italic", fontWeight: "bold", color: "#78350f", paddingTop: "2px" }}>
-                              Sisa Pelunasan
-                            </td>
-                            <td style={{ textAlign: "right", fontFamily: "monospace", fontWeight: "bold", color: "#78350f", paddingTop: "2px" }}>
-                              {formatRupiah(sisa)}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            {/* ===== INFORMASI PEMBAYARAN ===== */}
-            <div style={{ marginTop: "10px", border: "1px solid #cbd5e1", padding: "6px 10px", backgroundColor: "#f8fafc", fontSize: "9.5px" }}>
-              <div style={{ fontWeight: "bold", color: "#000000", marginBottom: "3px", fontSize: "10px" }}>
-                Informasi Pembayaran :
+                {/* Right: Signature & Stamp */}
+                <div style={{ textAlign: "center", width: "160px" }}>
+                  <div style={{ fontSize: "9.5px", color: "#334155", marginBottom: "4px" }}>
+                    Hormat Kami,
+                  </div>
+                  <div style={{ height: "46px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <img
+                      src={logoImg}
+                      alt="Stamp"
+                      style={{
+                        maxWidth: "44px",
+                        maxHeight: "44px",
+                        width: "auto",
+                        height: "auto",
+                        opacity: "0.85",
+                        display: "inline-block",
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      textDecoration: "underline",
+                      fontSize: "11px",
+                      color: "#0f172a",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {companyProfile?.signer_name || "Sulton Aziz"}
+                  </div>
+                  <div style={{ fontSize: "9.5px", color: "#475569" }}>
+                    {companyProfile?.signer_title || "Direktur"}
+                  </div>
+                </div>
               </div>
-              <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                <tbody>
-                  <tr>
-                    <td style={{ width: "110px", color: "#475569" }}>Nama Penerima</td>
-                    <td style={{ fontWeight: "bold", color: "#000000" }}>: {companyProfile?.bank_account_holder || "LUAR JENDELA CREATRIP"}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ color: "#475569" }}>Bank</td>
-                    <td style={{ fontWeight: "bold", color: "#000000" }}>: {companyProfile?.bank_name || "Bank Central Asia (BCA)"}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ color: "#475569" }}>Nomor Rekening</td>
-                    <td style={{ fontWeight: "bold", fontFamily: "monospace", color: "#000000" }}>: {companyProfile?.bank_account_no || "166 330 8151"}</td>
-                  </tr>
-                </tbody>
-              </table>
             </div>
-
-            {/* ===== SYARAT & KETENTUAN (15 Points) ===== */}
-            <div style={{ marginTop: "8px", border: "1px solid #cbd5e1", padding: "6px 10px", fontSize: "8.5px", lineHeight: "1.3" }}>
-              <div style={{ fontWeight: "bold", color: "#000000", marginBottom: "3px" }}>Syarat & Ketentuan :</div>
-              <table style={{ borderCollapse: "collapse", width: "100%", color: "#334155" }}>
-                <tbody>
-                  <tr><td style={{ width: "16px", verticalAlign: "top" }}>1.</td><td>Harga SUDAH TERMASUK biaya bahan bakar dan jasa supir</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>2.</td><td>Harga BELUM TERMASUK biaya tol, parkir, makan crew, retribusi jalan, akomodasi/penginapan kru bus (bila menginap), TIP pengemudi</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>3.</td><td>Pemesanan baru DIANGGAP SAH apabila sudah melakukan pembayaran uang muka, pembayaran uang muka minimum 50% dari total</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>4.</td><td>Pembayaran sewa harus lunas 3 hari sebelum keberangkatan</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>5.</td><td>Uang sewa / DP tidak dapat dikembalikan apabila terjadi pembatalan (hangus)</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>6.</td><td>Pembatalan 3 hari sebelum keberangkatan dikenakan cancelation fee 100% dari harga</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>7.</td><td>Kehilangan barang / tertukar di dalam bus bukan tanggung jawab pengelola bus dan kru</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>8.</td><td>Pengemudi berhak menolak jalan yang tidak memadai / dilarang petugas / membahayakan</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>9.</td><td>Perhitungan penggunaan bus 1 hari = Pukul 05.00 s/d Pukul 23.00</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>10.</td><td>Batas Pemakaian Bus (Dalam Kota) maksimum 12 Jam terhitung mulai dari jam penjemputan</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>11.</td><td>Batas Pemakaian Bus (Luar Kota) paling pagi pukul 05.00 sampai maksimum pukul 23.00</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>12.</td><td>Pemakaian melebihi 12 Jam (Dalam Kota) dan atau Melebihi pukul 23.00 (Luar Kota) dikenakan overtime charge</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>13.</td><td>Penyewa harus bertanggung jawab apabila merusak kendaraan / bus</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>14.</td><td>Penjemputan untuk area dalam kota Jakarta GRATIS</td></tr>
-                  <tr><td style={{ verticalAlign: "top" }}>15.</td><td>Penjemputan diluar area Jakarta yang tidak searah dikenakan charge sesuai jarak penjemputan.</td></tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* ===== SIGNATURE & QR FOOTER (Table-based, no flex) ===== */}
-            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "12px" }}>
-              <tbody>
-                <tr>
-                  {/* Left: QR Code Verification - use table instead of flex for html2canvas */}
-                  <td style={{ width: "50%", verticalAlign: "bottom" }}>
-                    <table style={{ borderCollapse: "collapse" }}>
-                      <tbody>
-                        <tr>
-                          <td style={{ verticalAlign: "middle", paddingRight: "8px" }}>
-                            {invoice.qr_signature ? (
-                              <img
-                                src={invoice.qr_signature}
-                                alt="QR Verification"
-                                style={{
-                                  width: "55px",
-                                  height: "55px",
-                                  border: "1px solid #cbd5e1",
-                                  padding: "2px",
-                                  backgroundColor: "#ffffff",
-                                  display: "block",
-                                }}
-                              />
-                            ) : (
-                              <div style={{
-                                width: "55px",
-                                height: "55px",
-                                border: "1px dashed #cbd5e1",
-                                textAlign: "center",
-                                lineHeight: "55px",
-                                fontSize: "8px",
-                                color: "#94a3b8",
-                              }}>
-                                QR Code
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ verticalAlign: "middle", fontSize: "8.5px", color: "#64748b" }}>
-                            <div style={{ color: "#166534", fontWeight: "bold" }}>✓ Terverifikasi Resmi</div>
-                            <div>Scan QR untuk cek keaslian dokumen</div>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-
-                  {/* Right: Signer */}
-                  <td style={{ width: "50%", textAlign: "center", verticalAlign: "bottom" }}>
-                    <table style={{ borderCollapse: "collapse", margin: "0 auto" }}>
-                      <tbody>
-                        <tr>
-                          <td style={{ textAlign: "center", fontSize: "9.5px", color: "#334155" }}>
-                            Hormat Kami,
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{ textAlign: "center", padding: "2px 0" }}>
-                            <img
-                              src={logoImg}
-                              alt="Stamp"
-                              style={{
-                                maxWidth: "42px",
-                                maxHeight: "42px",
-                                width: "auto",
-                                height: "auto",
-                                opacity: "0.85",
-                                display: "inline-block",
-                              }}
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{ textAlign: "center", fontWeight: "bold", textDecoration: "underline", fontSize: "10.5px", color: "#000000" }}>
-                            {companyProfile?.signer_name || "Sulton Aziz"}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{ textAlign: "center", fontSize: "9.5px", color: "#475569" }}>
-                            {companyProfile?.signer_title || "Direktur"}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
