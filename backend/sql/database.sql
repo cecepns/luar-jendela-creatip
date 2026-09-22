@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS `clients` (
 CREATE TABLE IF NOT EXISTS `fleets` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(150) NOT NULL,
-  `license_plate` VARCHAR(30) NOT NULL UNIQUE,
+  `license_plate` VARCHAR(30) NULL,
   `seat_capacity` INT NOT NULL DEFAULT 30,
   `facilities` VARCHAR(255) DEFAULT 'AC, TV, Audio, Reclining Seats, USB Charger',
   `photo_url` VARCHAR(255) NULL,

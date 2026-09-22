@@ -30,7 +30,7 @@ const navItems = [
     icon: Bus,
   },
   {
-    name: "Invoice & Kwitansi",
+    name: "Invoice & Kuitansi",
     path: "/invoice-kwitansi",
     icon: ReceiptText,
   },
@@ -64,9 +64,8 @@ export default function Sidebar({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 flex flex-col bg-white border-r border-slate-200 transition-all duration-300 ease-in-out ${
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        } ${isCollapsed ? "lg:w-20" : "w-64"}`}
+        className={`fixed top-0 bottom-0 left-0 z-40 flex flex-col bg-white border-r border-slate-200 transition-all duration-300 ease-in-out ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          } ${isCollapsed ? "lg:w-20" : "w-64"}`}
       >
         {/* Brand Header */}
         <div className="flex h-16 items-center justify-between border-b border-slate-100 px-4">
@@ -82,7 +81,7 @@ export default function Sidebar({
                   Luar Jendela
                 </span>
                 <span className="text-[11px] font-semibold text-brand-600 -mt-0.5 tracking-wider">
-                  CREATIP
+                  CREATRIP
                 </span>
               </div>
             )}
@@ -110,10 +109,9 @@ export default function Sidebar({
                   if (window.innerWidth < 1024) onClose();
                 }}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
-                    isActive
-                      ? "bg-brand-50 text-brand-700 font-semibold shadow-xs"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${isActive
+                    ? "bg-sky-50 text-sky-700 font-bold shadow-xs border-l-4 border-sky-600 pl-2.5"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   } ${isCollapsed ? "justify-center px-2" : ""}`
                 }
                 title={isCollapsed ? item.name : undefined}

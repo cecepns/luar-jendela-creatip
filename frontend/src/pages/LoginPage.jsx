@@ -44,19 +44,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center p-4 bg-slate-900 overflow-hidden font-sans">
-      {/* Background Image requested by client */}
+    <div className="relative flex min-h-screen items-center justify-center p-4 bg-sky-950 overflow-hidden font-sans">
+      {/* Background Image of Bus Laks - Clear, Bright & Vibrant as requested by client */}
       <img
         src={bgLoginImg}
-        alt="Background Luar Jendela"
-        className="absolute inset-0 h-full w-full object-cover object-center filter brightness-50 scale-105 transform animate-pulse duration-10000"
+        alt="Background Bus Luar Jendela Creatrip"
+        className="absolute inset-0 h-full w-full object-cover object-center filter brightness-90 contrast-105 scale-100 transform transition-transform duration-1000"
       />
-      {/* Dark overlay with subtle blue gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/70 to-slate-950/80" />
+      {/* Subtle Ocean Blue Gradient Overlay for readability without darkening the bus */}
+      <div className="absolute inset-0 bg-gradient-to-t from-sky-950/75 via-sky-900/30 to-sky-950/60 backdrop-blur-[1.5px]" />
 
       {/* Login Card Container */}
       <div className="relative z-10 w-full max-w-md">
-        <div className="rounded-3xl bg-white/90 p-8 shadow-2xl backdrop-blur-xl border border-white/40">
+        <div className="rounded-3xl bg-white/92 p-8 shadow-2xl backdrop-blur-xl border border-sky-100 shadow-sky-900/30">
           {/* Brand Logo & Title */}
           <div className="flex flex-col items-center text-center mb-8">
             <div className="p-3 bg-white rounded-2xl shadow-md border border-slate-100 mb-3">

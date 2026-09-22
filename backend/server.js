@@ -455,21 +455,21 @@ app.get('/api/fleets/all', async (req, res) => {
 app.post('/api/fleets', upload.single('photo'), async (req, res) => {
   try {
     const { name, license_plate, seat_capacity, facilities, status, notes } = req.body;
-    if (!name || !license_plate || !seat_capacity) {
-      return res.status(400).json({ success: false, message: 'Nama unit, Nopol, dan Jumlah kursi wajib diisi!' });
+    if (!name || !seat_capacity) {
+      return res.status(400).json({ success: false, message: 'Nama unit dan Jumlah kursi wajib diisi!' });
     }
 
     const photo_url = req.file ? `/uploads-luar-jendela/${req.file.filename}` : null;
 
     const [result] = await pool.query(
       'INSERT INTO fleets (name, license_plate, seat_capacity, facilities, photo_url, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, license_plate, parseInt(seat_capacity), facilities || '', photo_url, status || 'Tersedia', notes || '']
+      [name, license_plate ? license_plate.trim() : null, parseInt(seat_capacity), facilities || '', photo_url, status || 'Tersedia', notes || '']
     );
     const [rows] = await pool.query('SELECT * FROM fleets WHERE id = ?', [result.insertId]);
     return res.status(201).json({ success: true, message: 'Armada berhasil ditambahkan!', data: rows[0] });
   } catch (error) {
     console.error('Fleet create error:', error);
-    res.status(500).json({ success: false, message: 'Gagal menambahkan armada. Nopol mungkin sudah terdaftar.' });
+    res.status(500).json({ success: false, message: 'Gagal menambahkan armada. Silakan periksa data input.' });
   }
 });
 
@@ -481,7 +481,7 @@ app.put('/api/fleets/:id', upload.single('photo'), async (req, res) => {
     let photo_url = req.file ? `/uploads-luar-jendela/${req.file.filename}` : undefined;
 
     let query = 'UPDATE fleets SET name = ?, license_plate = ?, seat_capacity = ?, facilities = ?, status = ?, notes = ?';
-    const params = [name, license_plate, parseInt(seat_capacity), facilities || '', status || 'Tersedia', notes || ''];
+    const params = [name, license_plate ? license_plate.trim() : null, parseInt(seat_capacity), facilities || '', status || 'Tersedia', notes || ''];
 
     if (photo_url) {
       query += ', photo_url = ?';
@@ -519,12 +519,55 @@ function generateCode(prefix) {
   return `${prefix}/LJC/${dateStr}/${rand}`;
 }
 
+async function generateReceiptCode(targetDateStr = null) {
+  let dateStr;
+  if (targetDateStr) {
+    dateStr = targetDateStr.replace(/-/g, '');
+  } else {
+    const now = new Date();
+    try {
+      dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now).replace(/-/g, '');
+    } catch (e) {
+      dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    }
+  }
+
+  const prefix = `KWT/LJC/${dateStr}/`;
+
+  try {
+    const [rows] = await pool.query(
+      'SELECT receipt_number FROM receipts WHERE receipt_number LIKE ? ORDER BY id DESC',
+      [`${prefix}%`]
+    );
+
+    let maxSeq = 0;
+    for (const row of rows) {
+      if (!row.receipt_number) continue;
+      const parts = row.receipt_number.split('/');
+      const lastPart = parts[parts.length - 1];
+      const num = parseInt(lastPart, 10);
+      // Only count sequential numbers (< 1000 to ignore legacy 4-digit random numbers)
+      if (!isNaN(num) && num > maxSeq && num < 1000) {
+        maxSeq = num;
+      }
+    }
+
+    const nextSeq = String(maxSeq + 1).padStart(2, '0');
+    return `${prefix}${nextSeq}`;
+  } catch (error) {
+    console.error('Failed to generate sequential receipt code:', error);
+    return `${prefix}01`;
+  }
+}
+
 app.get('/api/reservations', async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, parseInt(req.query.limit) || 10);
     const search = (req.query.search || '').trim();
     const status = (req.query.status || '').trim();
+    const startDate = (req.query.startDate || '').trim();
+    const endDate = (req.query.endDate || '').trim();
     const offset = (page - 1) * limit;
 
     let countQuery = `
@@ -558,6 +601,18 @@ app.get('/api/reservations', async (req, res) => {
       params.push(status);
     }
 
+    if (startDate) {
+      countQuery += ' AND r.usage_date >= ?';
+      dataQuery += ' AND r.usage_date >= ?';
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      countQuery += ' AND (r.end_date <= ? OR (r.end_date IS NULL AND r.usage_date <= ?))';
+      dataQuery += ' AND (r.end_date <= ? OR (r.end_date IS NULL AND r.usage_date <= ?))';
+      params.push(endDate, endDate);
+    }
+
     dataQuery += ' ORDER BY r.id DESC LIMIT ? OFFSET ?';
     const [[cResult]] = await pool.query(countQuery, params);
     const total = cResult.total;
@@ -573,11 +628,15 @@ app.get('/api/reservations', async (req, res) => {
 
 app.post('/api/reservations', async (req, res) => {
   try {
-    const {
+    let {
       client_id,
+      new_client_name,
+      new_client_phone,
+      new_client_address,
       fleet_id,
       usage_date,
       end_date,
+      due_date,
       pickup_time,
       pickup_address,
       destination,
@@ -590,6 +649,15 @@ app.post('/api/reservations', async (req, res) => {
       notes,
       include_ppn
     } = req.body;
+
+    // Handle instant new client creation if provided
+    if (!client_id && new_client_name) {
+      const [newClientRes] = await pool.query(
+        'INSERT INTO clients (name, phone, address) VALUES (?, ?, ?)',
+        [new_client_name.trim(), new_client_phone ? new_client_phone.trim() : (pic_phone || '-'), new_client_address ? new_client_address.trim() : (pickup_address || '-')]
+      );
+      client_id = newClientRes.insertId;
+    }
 
     if (!client_id || !fleet_id || !usage_date || !destination || !pic_name || !pic_phone) {
       return res.status(400).json({ success: false, message: 'Mohon lengkapi field reservasi yang wajib diisi!' });
@@ -618,9 +686,10 @@ app.post('/api/reservations', async (req, res) => {
 
     const createdResId = resResult.insertId;
 
-    // Automatically generate linked Invoice
+    // Automatically generate linked Invoice with customizable Due Date
     const todayStr = new Date().toISOString().split('T')[0];
     const invStatus = resStatus === 'LUNAS' ? 'LUNAS' : dp > 0 ? 'DP' : 'Belum Lunas';
+    const invoiceDueDate = due_date || usage_date;
 
     const qrData = `${APP_URL}/verify/invoice/${invNumber}`;
     const qrImage = await QRCode.toDataURL(qrData);
@@ -630,12 +699,12 @@ app.post('/api/reservations', async (req, res) => {
       (invoice_number, reservation_id, client_id, invoice_date, due_date, subtotal, ppn_percent, ppn_amount, total_amount, paid_amount, payment_status, qr_signature, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      invNumber, createdResId, client_id, todayStr, usage_date, price, ppnPercent, ppnAmount, grandTotal, dp, invStatus, qrImage, `Invoice sewa armada untuk tujuan ${destination}`
+      invNumber, createdResId, client_id, todayStr, invoiceDueDate, price, ppnPercent, ppnAmount, grandTotal, dp, invStatus, qrImage, `Invoice sewa armada untuk tujuan ${destination}`
     ]);
 
     // If DP > 0 or Lunas, auto-generate initial Kwitansi
     if (dp > 0) {
-      const kwtNumber = generateCode('KWT');
+      const kwtNumber = await generateReceiptCode(todayStr);
       const kwtQrData = `${APP_URL}/verify/receipt/${kwtNumber}`;
       const kwtQrImage = await QRCode.toDataURL(kwtQrData);
       const spell = terbilang(dp);
@@ -757,14 +826,17 @@ app.get('/api/invoices', async (req, res) => {
       FROM invoices i
       JOIN clients c ON i.client_id = c.id
       LEFT JOIN reservations r ON i.reservation_id = r.id
+      LEFT JOIN fleets f ON r.fleet_id = f.id
       WHERE 1=1
     `;
     let dataQuery = `
       SELECT i.*, c.name AS client_name, c.phone AS client_phone, c.email AS client_email, c.address AS client_address,
-             r.destination, r.usage_date, r.pic_name, r.pic_phone, r.total_price, r.down_payment
+             r.destination, r.usage_date, r.end_date, r.pic_name, r.pic_phone, r.total_price, r.down_payment,
+             f.name AS fleet_name, f.license_plate
       FROM invoices i
       JOIN clients c ON i.client_id = c.id
       LEFT JOIN reservations r ON i.reservation_id = r.id
+      LEFT JOIN fleets f ON r.fleet_id = f.id
       WHERE 1=1
     `;
     const params = [];
@@ -792,6 +864,24 @@ app.get('/api/invoices', async (req, res) => {
   } catch (error) {
     console.error('Invoice list error:', error);
     res.status(500).json({ success: false, message: 'Gagal mengambil data invoice.' });
+  }
+});
+
+// Update Invoice Due Date manually
+app.patch('/api/invoices/:id/due-date', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { due_date } = req.body;
+    if (!due_date) {
+      return res.status(400).json({ success: false, message: 'Tanggal jatuh tempo wajib diisi!' });
+    }
+
+    await pool.query('UPDATE invoices SET due_date = ? WHERE id = ?', [due_date, id]);
+    const [rows] = await pool.query('SELECT * FROM invoices WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Tanggal jatuh tempo invoice berhasil diperbarui!', data: rows[0] });
+  } catch (error) {
+    console.error('Update due date error:', error);
+    res.status(500).json({ success: false, message: 'Gagal memperbarui tanggal jatuh tempo.' });
   }
 });
 
@@ -900,8 +990,8 @@ app.post('/api/invoices/:id/mark-paid', async (req, res) => {
 
     const invoice = rows[0];
     const payAmount = paid_amount ? parseFloat(paid_amount) : parseFloat(invoice.total_amount);
-    const kwtNumber = generateCode('KWT');
     const todayStr = new Date().toISOString().split('T')[0];
+    const kwtNumber = await generateReceiptCode(todayStr);
     const qrData = `${APP_URL}/verify/receipt/${kwtNumber}`;
     const qrImage = await QRCode.toDataURL(qrData);
     const spell = terbilang(payAmount);
@@ -963,7 +1053,7 @@ app.post('/api/midtrans/notification', async (req, res) => {
         await pool.query("UPDATE reservations SET status = 'LUNAS', remaining_payment = 0 WHERE id = ?", [inv.reservation_id]);
 
         // Auto receipt on webhook
-        const kwtNumber = generateCode('KWT');
+        const kwtNumber = await generateReceiptCode();
         const qrData = `${APP_URL}/verify/receipt/${kwtNumber}`;
         const qrImage = await QRCode.toDataURL(qrData);
         await pool.query(`

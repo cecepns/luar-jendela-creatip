@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Download, Loader2, ZoomIn, ZoomOut, CheckCircle2 } from "lucide-react";
+import { Download, Loader2, ZoomIn, ZoomOut, CheckCircle2, MessageSquare, Send } from "lucide-react";
 import Modal from "./Modal";
 import logoImg from "@/assets/logo.png";
+import signatureImg from "@/assets/signature.png";
 import { formatRupiah, formatTanggal } from "@/utils/formatters";
 import { exportElementToPdf } from "@/utils/pdfGenerator";
 
@@ -52,7 +53,7 @@ export default function PrintReceiptModal({
   const handleDownloadPdf = async () => {
     if (!printAreaRef.current) return;
     setIsGeneratingPdf(true);
-    const toastId = toast.loading("Sedang menyusun file PDF Kwitansi...");
+    const toastId = toast.loading("Sedang menyusun file PDF Kuitansi...");
 
     const previousZoom = zoomMode;
     try {
@@ -62,7 +63,7 @@ export default function PrintReceiptModal({
         await new Promise((resolve) => setTimeout(resolve, 150));
       }
 
-      const cleanFileName = `Kwitansi_${receipt.receipt_number.replace(/[\/\\]/g, "-")}.pdf`;
+      const cleanFileName = `Kuitansi_${receipt.receipt_number.replace(/[\/\\]/g, "-")}.pdf`;
       await exportElementToPdf(printAreaRef.current, cleanFileName, {
         orientation: "portrait",
         width: CANVAS_WIDTH,
@@ -70,7 +71,7 @@ export default function PrintReceiptModal({
         margin: 5,
         centerVertical: false,
       });
-      toast.success("File PDF Kwitansi berhasil diunduh!", { id: toastId });
+      toast.success("File PDF Kuitansi berhasil diunduh!", { id: toastId });
     } catch (err) {
       console.error("PDF generation error:", err);
       toast.error("Gagal membuat file PDF. Silakan coba lagi.", { id: toastId });
@@ -80,8 +81,39 @@ export default function PrintReceiptModal({
     }
   };
 
+  const handleSendWa = () => {
+    const clientName = receipt.client_name || "Pelanggan";
+    const receiptNo = receipt.receipt_number;
+    const dateStr = formatTanggal(receipt.receipt_date);
+    const amountStr = formatRupiah(receipt.amount);
+    const forPayment = receipt.payment_for || "Sewa Bus Pariwisata";
+    const methodStr = receipt.payment_method || "Transfer Bank / Midtrans";
+
+    const text = `Halo ${clientName},
+
+Berikut bukti pembayaran / Kuitansi resmi dari LUAR JENDELA CREATRIP:
+
+No. Kuitansi: ${receiptNo}
+Tanggal: ${dateStr}
+Untuk Pembayaran: ${forPayment}
+Total Nominal: ${amountStr} (LUNAS)
+Metode: ${methodStr}
+
+Terima kasih atas kerjasamanya 🙏`;
+
+    let phone = receipt.client_phone ? receipt.client_phone.replace(/[^0-9]/g, "") : "";
+    if (phone.startsWith("0")) phone = "62" + phone.slice(1);
+
+    handleDownloadPdf();
+
+    const waUrl = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, "_blank");
+  };
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Kwitansi Resmi Luar Jendela Creatrip" maxWidth="max-w-4xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="Kuitansi Resmi Luar Jendela Creatrip" maxWidth="max-w-4xl">
       <div className="space-y-4">
         {/* Action Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
@@ -112,6 +144,17 @@ export default function PrintReceiptModal({
               </button>
             )}
 
+            {/* Kirim ke WA button */}
+            <button
+              type="button"
+              onClick={handleSendWa}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
+              title="Kirim Kuitansi & Chat ke WhatsApp Klien"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Kirim ke WA</span>
+            </button>
+
             <button
               type="button"
               onClick={handleDownloadPdf}
@@ -126,7 +169,7 @@ export default function PrintReceiptModal({
               ) : (
                 <>
                   <Download className="w-4 h-4" />
-                  <span>Cetak PDF Kwitansi</span>
+                  <span>Cetak PDF Kuitansi</span>
                 </>
               )}
             </button>
@@ -199,18 +242,11 @@ export default function PrintReceiptModal({
                       textTransform: "uppercase",
                       color: "#0f172a",
                       lineHeight: "1.2",
+                      marginBottom: "6px",
                     }}
                   >
                     {companyProfile?.company_name || "LUAR JENDELA CREATRIP"}
                   </div>
-                  <div
-                    style={{
-                      height: "2px",
-                      width: "170px",
-                      backgroundColor: "#0f172a",
-                      margin: "5px auto 6px auto",
-                    }}
-                  />
                   <div style={{ fontSize: "9.5px", color: "#334155", fontWeight: "500", lineHeight: "1.35" }}>
                     {companyProfile?.address || "Jalan Puskesmas Setu RT 4/3 No. 34 Setu, Cipayung, Jakarta Timur 13880"}
                   </div>
@@ -219,7 +255,7 @@ export default function PrintReceiptModal({
                   </div>
                 </div>
 
-                {/* KWITANSI Green Box */}
+                {/* KUITANSI Green Box */}
                 <div style={{ width: "135px", flexShrink: 0, textAlign: "right" }}>
                   <div
                     style={{
@@ -235,7 +271,7 @@ export default function PrintReceiptModal({
                       boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
                     }}
                   >
-                    KWITANSI
+                    KUITANSI
                   </div>
                 </div>
               </div>
@@ -250,12 +286,12 @@ export default function PrintReceiptModal({
                 }}
               />
 
-              {/* ===== KWITANSI BODY ===== */}
-              <div style={{ border: "1px solid #64748b", borderRadius: "2px", overflow: "hidden", marginBottom: "12px" }}>
+              {/* ===== KUITANSI BODY ===== */}
+              <div style={{ border: "1px solid #64748b", borderRadius: "2px", overflow: "hidden", marginBottom: "16px" }}>
                 {/* Meta Row: No & Tanggal */}
                 <div style={{ display: "flex", backgroundColor: "#f8fafc", borderBottom: "1px solid #64748b", padding: "7px 12px", fontSize: "10.5px" }}>
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontStyle: "italic", fontWeight: "bold", color: "#475569", marginRight: "6px" }}>NO. KWITANSI:</span>
+                    <span style={{ fontStyle: "italic", fontWeight: "bold", color: "#475569", marginRight: "6px" }}>NO. KUITANSI:</span>
                     <span style={{ fontWeight: "bold", fontFamily: "monospace", color: "#0f172a" }}>{receipt.receipt_number}</span>
                   </div>
                   <div style={{ textAlign: "right" }}>
@@ -274,12 +310,12 @@ export default function PrintReceiptModal({
                   </div>
                 </div>
 
-                {/* Uang Sejumlah (Say / Terbilang) */}
-                <div style={{ display: "flex", backgroundColor: "#f59e0b", borderBottom: "1px solid #d97706", padding: "10px 12px", alignItems: "flex-start", color: "#0f172a" }}>
-                  <div style={{ width: "150px", fontWeight: "900", fontSize: "11px", flexShrink: 0 }}>
+                {/* Uang Sejumlah (Say / Terbilang) - Clean Slate design per client request */}
+                <div style={{ display: "flex", backgroundColor: "#f8fafc", borderBottom: "1px solid #cbd5e1", padding: "10px 12px", alignItems: "flex-start", color: "#0f172a" }}>
+                  <div style={{ width: "150px", fontWeight: "bold", color: "#334155", fontSize: "11px", flexShrink: 0 }}>
                     Uang Sejumlah (Say)
                   </div>
-                  <div style={{ fontStyle: "italic", fontWeight: "bold", fontSize: "12px", lineHeight: "1.3" }}>
+                  <div style={{ fontStyle: "italic", fontWeight: "bold", fontSize: "11.5px", lineHeight: "1.3", color: "#0f172a" }}>
                     : {receipt.spell_out || "-"}
                   </div>
                 </div>
@@ -295,17 +331,17 @@ export default function PrintReceiptModal({
                 </div>
 
                 {/* Metode Pembayaran */}
-                <div style={{ display: "flex", borderBottom: "1px solid #64748b", padding: "8px 12px", backgroundColor: "#f8fafc" }}>
+                <div style={{ display: "flex", borderBottom: "1px solid #64748b", padding: "8px 12px", backgroundColor: "#ffffff" }}>
                   <div style={{ width: "150px", fontStyle: "italic", fontWeight: "bold", color: "#475569", flexShrink: 0 }}>
                     Metode Pembayaran
                   </div>
-                  <div style={{ color: "#334155" }}>
+                  <div style={{ color: "#334155", fontWeight: "500" }}>
                     : {receipt.payment_method || "Transfer Bank / Midtrans"}
                   </div>
                 </div>
 
                 {/* Nominal Jumlah Box */}
-                <div style={{ display: "flex", backgroundColor: "#f59e0b", padding: "10px 12px", alignItems: "center" }}>
+                <div style={{ display: "flex", backgroundColor: "#f8fafc", padding: "10px 12px", alignItems: "center", borderTop: "1px solid #cbd5e1" }}>
                   <div style={{ width: "150px", fontWeight: "900", color: "#0f172a", fontSize: "11px", flexShrink: 0 }}>
                     JUMLAH NOMINAL
                   </div>
@@ -326,25 +362,6 @@ export default function PrintReceiptModal({
                       {formatRupiah(receipt.amount)}
                     </span>
                   </div>
-                </div>
-              </div>
-
-              {/* ===== BANK INFO ===== */}
-              <div
-                style={{
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "2px",
-                  padding: "7px 12px",
-                  backgroundColor: "#f8fafc",
-                  fontSize: "9.5px",
-                  marginBottom: "14px",
-                }}
-              >
-                <div style={{ fontWeight: "bold", color: "#0f172a", marginBottom: "3px" }}>
-                  Rekening Resmi Pembayaran:
-                </div>
-                <div style={{ color: "#334155" }}>
-                  Bank: <strong style={{ color: "#0f172a" }}>{companyProfile?.bank_name || "Bank Central Asia (BCA)"}</strong> | No. Rek: <strong style={{ fontFamily: "monospace", color: "#0f172a" }}>{companyProfile?.bank_account_no || "166 330 8151"}</strong> a/n <strong style={{ color: "#0f172a" }}>{companyProfile?.bank_account_holder || "LUAR JENDELA CREATRIP"}</strong>
                 </div>
               </div>
 
@@ -398,27 +415,43 @@ export default function PrintReceiptModal({
                   <div style={{ fontSize: "9.5px", color: "#334155", marginBottom: "4px" }}>
                     Hormat Kami,
                   </div>
-                  <div style={{ height: "46px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ height: "54px", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                    {/* Official Stamp */}
                     <img
                       src={logoImg}
                       alt="Stamp"
                       style={{
-                        maxWidth: "44px",
-                        maxHeight: "44px",
+                        maxWidth: "42px",
+                        maxHeight: "42px",
                         width: "auto",
                         height: "auto",
-                        opacity: "0.85",
-                        display: "inline-block",
+                        opacity: "0.4",
+                        position: "absolute",
+                        left: "12px",
+                      }}
+                    />
+                    {/* Digital Hand Signature */}
+                    <img
+                      src={signatureImg}
+                      alt="Tanda Tangan Sulton Aziz"
+                      style={{
+                        height: "52px",
+                        width: "auto",
+                        objectFit: "contain",
+                        zIndex: 1,
                       }}
                     />
                   </div>
                   <div
                     style={{
                       fontWeight: "bold",
-                      textDecoration: "underline",
                       fontSize: "11px",
                       color: "#0f172a",
-                      marginTop: "4px",
+                      marginTop: "2px",
+                      borderTop: "1px solid #cbd5e1",
+                      paddingTop: "2px",
+                      display: "inline-block",
+                      minWidth: "120px",
                     }}
                   >
                     {companyProfile?.signer_name || "Sulton Aziz"}

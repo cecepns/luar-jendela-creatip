@@ -29,7 +29,7 @@ export default function Navbar({
             className="w-8 h-8 object-contain rounded-lg"
           />
           <span className="font-bold text-slate-800 text-sm tracking-tight truncate">
-            Luar Jendela Creatip
+            Luar Jendela Creatrip
           </span>
         </div>
       </div>
@@ -40,11 +40,10 @@ export default function Navbar({
         <button
           type="button"
           onClick={onOpenH2Modal}
-          className={`relative rounded-xl p-2 transition-all ${
-            h2Count > 0
-              ? "bg-amber-50 text-amber-600 hover:bg-amber-100 ring-2 ring-amber-400/20"
-              : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-          }`}
+          className={`relative rounded-xl p-2 transition-all ${h2Count > 0
+            ? "bg-amber-50 text-amber-600 hover:bg-amber-100 ring-2 ring-amber-400/20"
+            : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            }`}
           title="Pengingat Keberangkatan H-2"
         >
           <Bell className="w-5 h-5" />

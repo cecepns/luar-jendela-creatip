@@ -62,6 +62,7 @@ export const API_ENDPOINTS = {
     DETAIL: (id) => `/api/invoices/${id}`,
     CREATE: "/api/invoices",
     UPDATE: (id) => `/api/invoices/${id}`,
+    UPDATE_DUE_DATE: (id) => `/api/invoices/${id}/due-date`,
     MIDTRANS_TOKEN: (id) => `/api/invoices/${id}/midtrans-token`,
     MARK_PAID: (id) => `/api/invoices/${id}/mark-paid`,
   },

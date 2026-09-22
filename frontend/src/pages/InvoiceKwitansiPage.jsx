@@ -12,12 +12,16 @@ import {
   ExternalLink,
   ShieldCheck,
   Check,
+  MessageSquare,
+  Copy,
+  Edit3,
 } from "lucide-react";
 import { request } from "@/utils/request";
 import { API_ENDPOINTS } from "@/utils/endpoints";
 import { formatRupiah, formatTanggal, getStatusBadge } from "@/utils/formatters";
 import SearchInput from "@/components/SearchInput";
 import Pagination from "@/components/Pagination";
+import Modal from "@/components/Modal";
 import PrintInvoiceModal from "@/components/PrintInvoiceModal";
 import PrintReceiptModal from "@/components/PrintReceiptModal";
 
@@ -50,6 +54,12 @@ export default function InvoiceKwitansiPage() {
 
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+
+  // Due Date Edit Modal
+  const [isDueDateModalOpen, setIsDueDateModalOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState(null);
+  const [newDueDate, setNewDueDate] = useState("");
+  const [isSavingDueDate, setIsSavingDueDate] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -104,7 +114,7 @@ export default function InvoiceKwitansiPage() {
         }
       }
     } catch {
-      toast.error("Gagal memuat data kwitansi.");
+      toast.error("Gagal memuat data kuitansi.");
     } finally {
       setIsLoading(false);
     }
@@ -128,6 +138,11 @@ export default function InvoiceKwitansiPage() {
         return;
       }
 
+      const snapUrl = res.redirect_url || `https://app.midtrans.com/snap/v4/redirection/${res.token}`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(snapUrl).catch(() => {});
+      }
+
       // Ensure Midtrans Snap script is loaded (Live Production)
       if (!window.snap) {
         await new Promise((resolve) => {
@@ -145,7 +160,6 @@ export default function InvoiceKwitansiPage() {
         window.snap.pay(res.token, {
           onSuccess: async function (result) {
             toast.success("Pembayaran berhasil via Midtrans!");
-            // Mark invoice as paid and generate receipt
             await request.post(API_ENDPOINTS.INVOICES.MARK_PAID(invoice.id), {
               status: "LUNAS",
               paid_amount: invoice.total_amount,
@@ -166,7 +180,6 @@ export default function InvoiceKwitansiPage() {
           },
         });
       } else {
-        // Fallback if snap script blocked: open redirect url
         if (res.redirect_url) {
           window.open(res.redirect_url, "_blank");
         } else {
@@ -180,6 +193,47 @@ export default function InvoiceKwitansiPage() {
     }
   };
 
+  // Open Due Date edit modal
+  const handleOpenEditDueDate = (invoice) => {
+    setEditingInvoice(invoice);
+    setNewDueDate(invoice.due_date ? invoice.due_date.split("T")[0] : "");
+    setIsDueDateModalOpen(true);
+  };
+
+  const handleSaveDueDate = async (e) => {
+    e.preventDefault();
+    if (!editingInvoice || !newDueDate) return;
+    setIsSavingDueDate(true);
+    try {
+      const res = await request.patch(API_ENDPOINTS.INVOICES.UPDATE_DUE_DATE(editingInvoice.id), {
+        due_date: newDueDate,
+      });
+      if (res.success) {
+        toast.success("Tanggal jatuh tempo invoice berhasil diperbarui!");
+        setIsDueDateModalOpen(false);
+        fetchInvoices();
+      }
+    } catch {
+      toast.error("Gagal memperbarui tanggal jatuh tempo.");
+    } finally {
+      setIsSavingDueDate(false);
+    }
+  };
+
+  // Copy snap payment link helper
+  const handleCopySnapLink = async (invoice) => {
+    try {
+      const res = await request.post(API_ENDPOINTS.INVOICES.MIDTRANS_TOKEN(invoice.id));
+      if (res.success && (res.redirect_url || res.token)) {
+        const link = res.redirect_url || `https://app.midtrans.com/snap/v4/redirection/${res.token}`;
+        await navigator.clipboard.writeText(link);
+        toast.success("Link Snap Midtrans berhasil disalin ke clipboard!");
+      }
+    } catch {
+      toast.error("Gagal membuat link Midtrans.");
+    }
+  };
+
   // Toggle Mark as Paid manually
   const handleMarkPaid = async (invoice) => {
     try {
@@ -189,7 +243,7 @@ export default function InvoiceKwitansiPage() {
         payment_method: "Transfer Bank BCA",
       });
       if (res.success) {
-        toast.success(res.message || "Invoice ditandai LUNAS & Kwitansi otomatis diterbitkan!");
+        toast.success(res.message || "Invoice ditandai LUNAS & Kuitansi otomatis diterbitkan!");
         fetchInvoices();
         fetchReceipts();
       }
@@ -204,10 +258,10 @@ export default function InvoiceKwitansiPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Invoice & Kwitansi Resmi
+            Invoice & Kuitansi Resmi
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Penerbitan otomatis, pembayaran Midtrans Snap, terbilang rupiah & tanda tangan digital QR
+            Penerbitan otomatis, pembayaran online Midtrans Snap, terbilang rupiah & kirim langsung ke WhatsApp
           </p>
         </div>
       </div>
@@ -237,7 +291,7 @@ export default function InvoiceKwitansiPage() {
           }`}
         >
           <FileCheck className="w-4 h-4" />
-          <span>Daftar Kwitansi Resmi ({totalReceipts})</span>
+          <span>Daftar Kuitansi ({totalReceipts})</span>
         </button>
       </div>
 
@@ -332,7 +386,17 @@ export default function InvoiceKwitansiPage() {
                           </td>
 
                           <td className="py-3.5 px-4 text-slate-600">
-                            {formatTanggal(inv.due_date)}
+                            <div className="flex items-center gap-1.5">
+                              <span>{formatTanggal(inv.due_date)}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditDueDate(inv)}
+                                className="p-1 rounded text-slate-400 hover:text-brand-600 hover:bg-slate-100 transition-colors"
+                                title="Ubah Tanggal Jatuh Tempo"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
 
                           <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
@@ -363,16 +427,26 @@ export default function InvoiceKwitansiPage() {
                             <div className="flex items-center justify-end gap-1.5">
                               {/* Midtrans Button */}
                               {!isPaid && (
-                                <button
-                                  type="button"
-                                  onClick={() => handlePayMidtrans(inv)}
-                                  disabled={isProcessingPayment}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors"
-                                  title="Bayar dengan Midtrans (QRIS/VA)"
-                                >
-                                  <CreditCard className="w-3.5 h-3.5" />
-                                  <span>Midtrans</span>
-                                </button>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePayMidtrans(inv)}
+                                    disabled={isProcessingPayment}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-colors"
+                                    title="Buka Pembayaran Midtrans Snap"
+                                  >
+                                    <CreditCard className="w-3.5 h-3.5" />
+                                    <span>Midtrans</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopySnapLink(inv)}
+                                    className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+                                    title="Salin Link Snap Midtrans untuk dikirim ke Klien"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               )}
 
                               {/* Manual Lunas Toggle */}
@@ -388,7 +462,7 @@ export default function InvoiceKwitansiPage() {
                                 </button>
                               )}
 
-                              {/* Print / View */}
+                              {/* Print / View & Kirim WA */}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -396,7 +470,7 @@ export default function InvoiceKwitansiPage() {
                                   setIsInvoiceModalOpen(true);
                                 }}
                                 className="p-1.5 rounded-lg text-brand-600 hover:bg-brand-50 transition-colors"
-                                title="Lihat & Cetak Invoice Resmi"
+                                title="Lihat, Cetak & Kirim WA"
                               >
                                 <Printer className="w-4 h-4" />
                               </button>
@@ -437,7 +511,7 @@ export default function InvoiceKwitansiPage() {
                   setSearchRec(val);
                   setPageRec(1);
                 }}
-                placeholder="Cari no. kwitansi, klien, keterangan..."
+                placeholder="Cari no. kuitansi, klien, keterangan..."
               />
             </div>
           </div>
@@ -447,7 +521,7 @@ export default function InvoiceKwitansiPage() {
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead className="bg-slate-50 text-slate-600 border-b border-slate-100">
                   <tr>
-                    <th className="py-3.5 px-4 font-semibold">No. Kwitansi</th>
+                    <th className="py-3.5 px-4 font-semibold">No. Kuitansi</th>
                     <th className="py-3.5 px-4 font-semibold">Diterima Dari</th>
                     <th className="py-3.5 px-4 font-semibold">Tanggal</th>
                     <th className="py-3.5 px-4 font-semibold">Untuk Pembayaran</th>
@@ -461,13 +535,13 @@ export default function InvoiceKwitansiPage() {
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-slate-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-600 mb-2" />
-                        Memuat data kwitansi...
+                        Memuat data kuitansi...
                       </td>
                     </tr>
                   ) : receipts.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-slate-400">
-                        Belum ada kwitansi yang diterbitkan.
+                        Belum ada kuitansi yang diterbitkan.
                       </td>
                     </tr>
                   ) : (
@@ -508,7 +582,7 @@ export default function InvoiceKwitansiPage() {
                               setIsReceiptModalOpen(true);
                             }}
                             className="p-1.5 rounded-lg text-brand-600 hover:bg-brand-50 transition-colors"
-                            title="Cetak Kwitansi Resmi"
+                            title="Cetak Kuitansi Resmi"
                           >
                             <Printer className="w-4 h-4" />
                           </button>
@@ -534,6 +608,50 @@ export default function InvoiceKwitansiPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Ubah Tanggal Jatuh Tempo */}
+      <Modal
+        isOpen={isDueDateModalOpen}
+        onClose={() => setIsDueDateModalOpen(false)}
+        title="Ubah Tanggal Jatuh Tempo (Due Date)"
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleSaveDueDate} className="space-y-4">
+          <div>
+            <p className="text-xs text-slate-500 mb-3">
+              Atur batas akhir pembayaran untuk Invoice <strong>{editingInvoice?.invoice_number}</strong> ({editingInvoice?.client_name}) sebelum invoice dirilis atau dikirim ke klien.
+            </p>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Tanggal Jatuh Tempo Baru <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={newDueDate}
+              onChange={(e) => setNewDueDate(e.target.value)}
+              required
+              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsDueDateModalOpen(false)}
+              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={isSavingDueDate}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm transition-all disabled:opacity-50"
+            >
+              {isSavingDueDate && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>Simpan Tanggal</span>
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Print / View Invoice Modal */}
       <PrintInvoiceModal

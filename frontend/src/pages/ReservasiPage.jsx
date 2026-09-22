@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import {
   CalendarDays,
   Plus,
@@ -16,6 +18,8 @@ import {
   CreditCard,
   CheckCircle,
   Loader2,
+  UserPlus,
+  Users as UsersIcon,
 } from "lucide-react";
 import { request } from "@/utils/request";
 import { API_ENDPOINTS } from "@/utils/endpoints";
@@ -24,6 +28,15 @@ import SearchInput from "@/components/SearchInput";
 import Pagination from "@/components/Pagination";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+
+// Helper: Calculate total duration in days
+export const calculateDurationDays = (start, end) => {
+  if (!start) return 1;
+  const s = new Date(start);
+  const e = end ? new Date(end) : new Date(start);
+  const diff = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  return Math.max(1, isNaN(diff) ? 1 : diff);
+};
 
 export default function ReservasiPage() {
   const [reservations, setReservations] = useState([]);
@@ -35,11 +48,14 @@ export default function ReservasiPage() {
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [filterStartDate, setFilterStartDate] = useState(null);
+  const [filterEndDate, setFilterEndDate] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Form State for Modal Create / Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState("create"); // "create" | "edit"
+  const [clientInputMode, setClientInputMode] = useState("existing"); // "existing" | "direct"
   const [currentId, setCurrentId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -54,9 +70,13 @@ export default function ReservasiPage() {
 
   const initialForm = {
     client_id: "",
+    new_client_name: "",
+    new_client_phone: "",
+    new_client_address: "",
     fleet_id: "",
     usage_date: "",
     end_date: "",
+    due_date: "",
     pickup_time: "06:30",
     pickup_address: "",
     destination: "",
@@ -94,6 +114,8 @@ export default function ReservasiPage() {
         limit,
         search,
         status: statusFilter,
+        startDate: filterStartDate ? filterStartDate.toISOString().split("T")[0] : "",
+        endDate: filterEndDate ? filterEndDate.toISOString().split("T")[0] : "",
       };
       const res = await request.get(API_ENDPOINTS.RESERVATIONS.LIST, params);
       if (res.success) {
@@ -108,7 +130,7 @@ export default function ReservasiPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, search, statusFilter]);
+  }, [page, limit, search, statusFilter, filterStartDate, filterEndDate]);
 
   useEffect(() => {
     fetchReservations();
@@ -120,18 +142,24 @@ export default function ReservasiPage() {
 
   const handleOpenCreate = () => {
     setModalMode("create");
+    setClientInputMode("existing");
     setFormData(initialForm);
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (res) => {
     setModalMode("edit");
+    setClientInputMode("existing");
     setCurrentId(res.id);
     setFormData({
       client_id: res.client_id,
+      new_client_name: "",
+      new_client_phone: "",
+      new_client_address: "",
       fleet_id: res.fleet_id,
       usage_date: res.usage_date ? res.usage_date.split("T")[0] : "",
       end_date: res.end_date ? res.end_date.split("T")[0] : "",
+      due_date: res.due_date ? res.due_date.split("T")[0] : (res.usage_date ? res.usage_date.split("T")[0] : ""),
       pickup_time: res.pickup_time || "06:30",
       pickup_address: res.pickup_address || "",
       destination: res.destination || "",
@@ -149,18 +177,34 @@ export default function ReservasiPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.client_id || !formData.fleet_id || !formData.usage_date || !formData.destination || !formData.pic_name || !formData.pic_phone) {
-      toast.error("Mohon lengkapi seluruh field yang wajib diisi!");
+    if (clientInputMode === "existing" && !formData.client_id) {
+      toast.error("Mohon pilih klien atau beralih ke Input Klien Baru!");
+      return;
+    }
+    if (clientInputMode === "direct" && !formData.new_client_name) {
+      toast.error("Mohon masukkan nama klien baru!");
+      return;
+    }
+    if (!formData.fleet_id || !formData.usage_date || !formData.destination || !formData.pic_name || !formData.pic_phone) {
+      toast.error("Mohon lengkapi seluruh field wajib (Armada, Tgl Berangkat, Tujuan, PIC & No HP)!");
       return;
     }
 
     setIsSubmitting(true);
     try {
       if (modalMode === "create") {
-        const res = await request.post(API_ENDPOINTS.RESERVATIONS.CREATE, formData);
+        const payload = {
+          ...formData,
+          // If direct mode, auto-fill PIC info if empty
+          pic_name: formData.pic_name || formData.new_client_name,
+          pic_phone: formData.pic_phone || formData.new_client_phone,
+          pickup_address: formData.pickup_address || formData.new_client_address,
+        };
+        const res = await request.post(API_ENDPOINTS.RESERVATIONS.CREATE, payload);
         if (res.success) {
           toast.success(res.message || "Reservasi berhasil dibuat dan invoice otomatis diterbitkan!");
           setIsModalOpen(false);
+          fetchDropdownData(); // refresh clients list
           fetchReservations();
         }
       } else {
@@ -254,8 +298,8 @@ export default function ReservasiPage() {
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
-        <div className="w-full sm:w-72">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
+        <div className="w-full lg:w-72">
           <SearchInput
             value={search}
             onChange={(val) => {
@@ -266,8 +310,57 @@ export default function ReservasiPage() {
           />
         </div>
 
+        {/* Date Filter with React Datepicker */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
+            <CalendarDays className="w-4 h-4 text-sky-600 flex-shrink-0" />
+            <DatePicker
+              selected={filterStartDate}
+              onChange={(date) => {
+                setFilterStartDate(date);
+                setPage(1);
+              }}
+              selectsStart
+              startDate={filterStartDate}
+              endDate={filterEndDate}
+              placeholderText="Dari tgl..."
+              dateFormat="dd/MM/yyyy"
+              className="w-20 bg-transparent outline-none text-xs text-slate-800 placeholder:text-slate-400 font-medium"
+            />
+            <span className="text-slate-400 font-bold">-</span>
+            <DatePicker
+              selected={filterEndDate}
+              onChange={(date) => {
+                setFilterEndDate(date);
+                setPage(1);
+              }}
+              selectsEnd
+              startDate={filterStartDate}
+              endDate={filterEndDate}
+              minDate={filterStartDate}
+              placeholderText="Sampai tgl..."
+              dateFormat="dd/MM/yyyy"
+              className="w-20 bg-transparent outline-none text-xs text-slate-800 placeholder:text-slate-400 font-medium"
+            />
+            {(filterStartDate || filterEndDate) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterStartDate(null);
+                  setFilterEndDate(null);
+                  setPage(1);
+                }}
+                className="ml-1 text-slate-400 hover:text-rose-600 transition-colors text-xs font-bold"
+                title="Reset Filter Tanggal"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Filter Status Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
           {["", "Booking", "DP", "LUNAS", "BATAL"].map((st) => (
             <button
               key={st}
@@ -297,7 +390,7 @@ export default function ReservasiPage() {
                 <th className="py-3.5 px-4 font-semibold">No. Booking</th>
                 <th className="py-3.5 px-4 font-semibold">Klien & PIC</th>
                 <th className="py-3.5 px-4 font-semibold">Armada & Rute</th>
-                <th className="py-3.5 px-4 font-semibold">Jadwal Pakai</th>
+                <th className="py-3.5 px-4 font-semibold">Jadwal Berangkat - Pulang</th>
                 <th className="py-3.5 px-4 font-semibold text-right">Harga & DP</th>
                 <th className="py-3.5 px-4 font-semibold text-center">Status</th>
                 <th className="py-3.5 px-4 font-semibold text-right">Aksi</th>
@@ -350,13 +443,23 @@ export default function ReservasiPage() {
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <p className="font-medium text-slate-800">
+                        <div className="font-semibold text-slate-900 text-xs">
+                          <span className="text-[10px] uppercase font-bold text-sky-600 mr-1">Berangkat:</span>
                           {formatTanggal(r.usage_date)}
-                        </p>
-                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          {r.pickup_time || "07:00"} WIB
-                        </p>
+                        </div>
+                        <div className="font-semibold text-slate-700 text-xs mt-0.5">
+                          <span className="text-[10px] uppercase font-bold text-sky-600 mr-1">Pulang:</span>
+                          {formatTanggal(r.end_date || r.usage_date)}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md">
+                            ⏱️ {calculateDurationDays(r.usage_date, r.end_date)} Hari
+                          </span>
+                          <span className="text-[11px] text-slate-400 flex items-center gap-0.5">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            {r.pickup_time || "07:00"}
+                          </span>
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
@@ -451,24 +554,86 @@ export default function ReservasiPage() {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Klien */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Pilih Klien <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={formData.client_id}
-                onChange={(e) => handleClientChange(e.target.value)}
-                required
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              >
-                <option value="">-- Pilih Klien --</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.phone})
-                  </option>
-                ))}
-              </select>
+            {/* Input Klien - Pilihan / Input Langsung */}
+            <div className="sm:col-span-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-sky-600" />
+                  <span>Informasi Klien</span>
+                </label>
+                {modalMode === "create" && (
+                  <div className="flex bg-white p-0.5 rounded-xl border border-slate-200 shadow-xs text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setClientInputMode("existing")}
+                      className={`px-3 py-1 rounded-lg font-medium transition-all ${
+                        clientInputMode === "existing"
+                          ? "bg-sky-600 text-white font-semibold shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Pilih Terdaftar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setClientInputMode("direct")}
+                      className={`px-3 py-1 rounded-lg font-medium transition-all ${
+                        clientInputMode === "direct"
+                          ? "bg-sky-600 text-white font-semibold shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      + Input Langsung
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {clientInputMode === "existing" ? (
+                <div>
+                  <select
+                    value={formData.client_id}
+                    onChange={(e) => handleClientChange(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  >
+                    <option value="">-- Pilih Klien Terdaftar --</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.phone})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Nama Klien / Instansi <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: PT Surya Kencana / Bpk. Rahmat"
+                      value={formData.new_client_name}
+                      onChange={(e) => setFormData({ ...formData, new_client_name: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      No. WhatsApp / HP Klien
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 08123456789"
+                      value={formData.new_client_phone}
+                      onChange={(e) => setFormData({ ...formData, new_client_phone: e.target.value })}
+                      className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Armada */}
@@ -485,24 +650,10 @@ export default function ReservasiPage() {
                 <option value="">-- Pilih Armada --</option>
                 {fleets.map((f) => (
                   <option key={f.id} value={f.id}>
-                    {f.name} ({f.license_plate} - {f.seat_capacity} Seat)
+                    {f.name} {f.license_plate ? `(${f.license_plate})` : ""} - {f.seat_capacity} Seat
                   </option>
                 ))}
               </select>
-            </div>
-
-            {/* Tanggal Pemakaian */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Tanggal Pemakaian <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.usage_date}
-                onChange={(e) => setFormData({ ...formData, usage_date: e.target.value })}
-                required
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
             </div>
 
             {/* Jam Jemput */}
@@ -518,6 +669,59 @@ export default function ReservasiPage() {
                 required
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
+            </div>
+
+            {/* Tanggal Berangkat */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Tanggal Berangkat <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={formData.usage_date}
+                onChange={(e) => setFormData({ ...formData, usage_date: e.target.value })}
+                required
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+            </div>
+
+            {/* Tanggal Pulang */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Tanggal Pulang
+              </label>
+              <input
+                type="date"
+                min={formData.usage_date}
+                value={formData.end_date}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+            </div>
+
+            {/* Durasi Sewa Otomatis & Tanggal Jatuh Tempo */}
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-sky-50/70 p-3 rounded-2xl border border-sky-100">
+              <div className="flex items-center justify-between p-2.5 bg-white border border-sky-200 rounded-xl shadow-xs">
+                <span className="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-sky-600" />
+                  Total Durasi Sewa:
+                </span>
+                <span className="bg-sky-600 text-white font-extrabold text-xs px-2.5 py-1 rounded-lg shadow-xs">
+                  {calculateDurationDays(formData.usage_date, formData.end_date)} Hari
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  Jatuh Tempo Invoice (Due Date)
+                </label>
+                <input
+                  type="date"
+                  value={formData.due_date}
+                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                  className="w-full px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-xl focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              </div>
             </div>
 
             {/* Tujuan */}
@@ -691,18 +895,28 @@ export default function ReservasiPage() {
           maxWidth="max-w-xl"
         >
           <div className="space-y-4 text-xs sm:text-sm">
-            <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
               <div>
                 <span className="text-slate-400 block text-[11px]">Klien</span>
                 <span className="font-bold text-slate-800">{selectedRes.client_name}</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[11px]">Armada Unit</span>
-                <span className="font-bold text-slate-800">{selectedRes.fleet_name} ({selectedRes.license_plate})</span>
+                <span className="font-bold text-slate-800">{selectedRes.fleet_name} {selectedRes.license_plate ? `(${selectedRes.license_plate})` : ""}</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[11px]">Tanggal Pemakaian</span>
+                <span className="text-slate-400 block text-[11px]">Durasi Sewa</span>
+                <span className="font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 inline-block mt-0.5">
+                  ⏱️ {calculateDurationDays(selectedRes.usage_date, selectedRes.end_date)} Hari
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">Tgl Berangkat</span>
                 <span className="font-medium text-slate-800">{formatTanggal(selectedRes.usage_date)}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">Tgl Pulang</span>
+                <span className="font-medium text-slate-800">{formatTanggal(selectedRes.end_date || selectedRes.usage_date)}</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[11px]">Jam Jemput</span>
@@ -766,7 +980,7 @@ export default function ReservasiPage() {
         onConfirm={handleDelete}
         isLoading={isDeleting}
         title="Hapus Reservasi"
-        message="Apakah Anda yakin ingin menghapus data reservasi ini? Invoice dan kwitansi terkait juga akan terpengaruh."
+        message="Apakah Anda yakin ingin menghapus data reservasi ini? Invoice dan kuitansi terkait juga akan terpengaruh."
       />
     </div>
   );

@@ -97,7 +97,7 @@ export default function ProfilPage() {
                   Identitas Usaha
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Nama dan logo yang tercetak pada Invoice, Kwitansi, dan PWA
+                  Nama dan logo yang tercetak pada Invoice, Kuitansi, dan PWA
                 </p>
               </div>
             </div>
