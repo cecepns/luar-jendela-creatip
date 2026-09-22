@@ -1138,7 +1138,10 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     appName: 'Luar Jendela Creatip API Server',
     time: new Date().toISOString(),
-    dbEngine: 'MySQL Database'
+    dbEngine: 'MySQL Database',
+    appUrl: APP_URL,
+    midtransSnapUrl: MIDTRANS_SNAP_URL,
+    serverKeyPrefix: MIDTRANS_SERVER_KEY ? MIDTRANS_SERVER_KEY.substring(0, 8) + '...' : 'EMPTY'
   });
 });
 
