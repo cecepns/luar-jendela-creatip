@@ -51,25 +51,25 @@ export default function LoginPage() {
         alt="Background Bus Luar Jendela Creatrip"
         className="absolute inset-0 h-full w-full object-cover object-center filter brightness-90 contrast-105 scale-100 transform transition-transform duration-1000"
       />
-      {/* Subtle Ocean Blue Gradient Overlay for readability without darkening the bus */}
-      <div className="absolute inset-0 bg-gradient-to-t from-sky-950/75 via-sky-900/30 to-sky-950/60 backdrop-blur-[1.5px]" />
+
+
 
       {/* Login Card Container */}
       <div className="relative z-10 w-full max-w-md">
-        <div className="rounded-3xl bg-white/92 p-8 shadow-2xl backdrop-blur-xl border border-sky-100 shadow-sky-900/30">
+        <div className="rounded-3xl bg-white/10 p-8 shadow-2xl backdrop-blur-sm border border-white/20 shadow-sky-900/30">
           {/* Brand Logo & Title */}
           <div className="flex flex-col items-center text-center mb-8">
-            <div className="p-3 bg-white rounded-2xl shadow-md border border-slate-100 mb-3">
+            <div className="p-3 bg-white/15 rounded-2xl shadow-md border border-white/20 mb-3">
               <img
                 src={logoImg}
-                alt="Logo Luar Jendela Creatip"
+                alt="Logo Luar Jendela Creatrip"
                 className="w-16 h-16 object-contain"
               />
             </div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              Luar Jendela Creatip
+            <h1 className="text-2xl font-black text-white tracking-tight drop-shadow-md">
+              Luar Jendela Creatrip
             </h1>
-            <p className="text-xs text-slate-500 font-medium mt-1">
+            <p className="text-xs text-white font-semibold mt-1 drop-shadow-md">
               Sistem Manajemen Reservasi & Armada Bus Pariwisata
             </p>
           </div>
@@ -77,35 +77,35 @@ export default function LoginPage() {
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <label className="block text-xs font-semibold text-white mb-1.5">
                 Username atau Email
               </label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-800" />
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="admin"
                   required
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 text-slate-800 transition-all placeholder:text-slate-400 shadow-xs"
+                  className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/30 text-slate-800 transition-all placeholder:text-slate-400 shadow-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <label className="block text-xs font-semibold text-white mb-1.5">
                 Kata Sandi
               </label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-800" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 text-slate-800 transition-all placeholder:text-slate-400 shadow-xs"
+                  className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/30 text-slate-800 transition-all placeholder:text-slate-400 shadow-sm"
                 />
               </div>
             </div>
@@ -114,7 +114,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-60"
               >
                 {isLoading ? (
                   <>
@@ -132,9 +132,9 @@ export default function LoginPage() {
           </form>
 
           {/* Quick Credential Hint */}
-          <div className="mt-6 pt-4 border-t border-slate-200/60 text-center">
-            <p className="text-[11px] text-slate-500">
-              Demo Akses Default: <strong className="text-slate-700">admin</strong> / <strong className="text-slate-700">admin123</strong>
+          <div className="mt-6 pt-4 border-t border-white/20 text-center">
+            <p className="text-[11px] text-sky-200">
+              Demo Akses Default: <strong className="text-white">admin</strong> / <strong className="text-white">admin123</strong>
             </p>
           </div>
         </div>

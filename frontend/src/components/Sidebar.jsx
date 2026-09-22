@@ -62,25 +62,25 @@ export default function Sidebar({
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container — Ocean Blue Theme */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 flex flex-col bg-white border-r border-slate-200 transition-all duration-300 ease-in-out ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        className={`fixed top-0 bottom-0 left-0 z-40 flex flex-col bg-gradient-to-b from-sky-800 via-sky-900 to-slate-900 border-r border-sky-700/30 shadow-xl transition-all duration-300 ease-in-out ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           } ${isCollapsed ? "lg:w-20" : "w-64"}`}
       >
         {/* Brand Header */}
-        <div className="flex h-16 items-center justify-between border-b border-slate-100 px-4">
+        <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
           <div className="flex items-center gap-3 overflow-hidden">
             <img
               src={logoImg}
               alt="Logo"
-              className="w-9 h-9 object-contain flex-shrink-0 rounded-lg"
+              className="w-auto h-12 object-contain flex-shrink-0 rounded-lg bg-white/90 p-0.5"
             />
             {!isCollapsed && (
               <div className="flex flex-col truncate">
-                <span className="font-extrabold text-sm tracking-tight text-slate-900 truncate">
+                <span className="font-extrabold text-sm tracking-tight text-white truncate">
                   Luar Jendela
                 </span>
-                <span className="text-[11px] font-semibold text-brand-600 -mt-0.5 tracking-wider">
+                <span className="text-[11px] font-semibold text-sky-300 -mt-0.5 tracking-wider">
                   CREATRIP
                 </span>
               </div>
@@ -91,14 +91,14 @@ export default function Sidebar({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 lg:hidden"
+            className="rounded-lg p-1.5 text-sky-300 hover:bg-white/10 hover:text-white lg:hidden transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Navigation Menu Links */}
-        <nav className="flex-1 space-y-1.5 p-3 overflow-y-auto">
+        <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -110,8 +110,8 @@ export default function Sidebar({
                 }}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${isActive
-                    ? "bg-sky-50 text-sky-700 font-bold shadow-xs border-l-4 border-sky-600 pl-2.5"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    ? "bg-white/15 text-white font-bold shadow-md backdrop-blur-sm border-l-4 border-sky-300 pl-2.5"
+                    : "text-sky-100/80 hover:bg-white/10 hover:text-white"
                   } ${isCollapsed ? "justify-center px-2" : ""}`
                 }
                 title={isCollapsed ? item.name : undefined}
@@ -124,17 +124,17 @@ export default function Sidebar({
         </nav>
 
         {/* Desktop Collapse Button */}
-        <div className="hidden lg:flex border-t border-slate-100 p-3 justify-end">
+        <div className="hidden lg:flex border-t border-white/10 p-3 justify-end">
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="flex items-center justify-center p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 w-full transition-colors text-xs"
+            className="flex items-center justify-center p-2 rounded-xl text-sky-300 hover:bg-white/10 hover:text-white w-full transition-colors text-xs"
             title={isCollapsed ? "Buka Sidebar" : "Kecilkan Sidebar"}
           >
             {isCollapsed ? (
               <ChevronRight className="w-5 h-5" />
             ) : (
-              <div className="flex items-center gap-2 text-slate-500 font-medium">
+              <div className="flex items-center gap-2 text-sky-200 font-medium">
                 <ChevronLeft className="w-4 h-4" />
                 <span>Ciutkan</span>
               </div>
