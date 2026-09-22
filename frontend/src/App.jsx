@@ -121,8 +121,8 @@ export default function App() {
       />
 
       <Routes>
-        {/* Public QR Verification Route */}
-        <Route path="/verify/:type/:code" element={<VerifyPage />} />
+        {/* Public QR Verification Route (wildcard to allow codes with slashes like INV/LJC/...) */}
+        <Route path="/verify/:type/*" element={<VerifyPage />} />
 
         {/* Public Login Route */}
         <Route

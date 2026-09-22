@@ -1120,10 +1120,11 @@ app.get('/api/receipts', async (req, res) => {
    PUBLIC QR CODE SIGNATURE VERIFICATION (Strict MySQL)
 ========================================================== */
 
-app.get('/api/verify/:type/:code', async (req, res) => {
+app.get(['/api/verify/:type/:code', '/api/verify/:type/*'], async (req, res) => {
   try {
-    const { type, code } = req.params;
-    const cleanCode = decodeURIComponent(code);
+    const type = req.params.type;
+    const rawCode = req.params.code || req.params[0] || '';
+    const cleanCode = decodeURIComponent(rawCode);
 
     const [[company]] = await pool.query('SELECT * FROM company_profile LIMIT 1');
 

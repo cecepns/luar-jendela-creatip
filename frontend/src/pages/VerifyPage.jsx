@@ -7,7 +7,9 @@ import { API_ENDPOINTS } from "@/utils/endpoints";
 import { formatRupiah, formatTanggal } from "@/utils/formatters";
 
 export default function VerifyPage() {
-  const { type, code } = useParams();
+  const params = useParams();
+  const type = params.type;
+  const code = params["*"] || params.code;
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
