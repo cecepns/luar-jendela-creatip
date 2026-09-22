@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -20,6 +21,8 @@ import {
   Loader2,
   UserPlus,
   Users as UsersIcon,
+  Table,
+  CalendarRange,
 } from "lucide-react";
 import { request } from "@/utils/request";
 import { API_ENDPOINTS } from "@/utils/endpoints";
@@ -28,6 +31,7 @@ import SearchInput from "@/components/SearchInput";
 import Pagination from "@/components/Pagination";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import ReservationGanttTimeline from "@/components/ReservationGanttTimeline";
 
 // Helper: Calculate total duration in days
 export const calculateDurationDays = (start, end) => {
@@ -39,6 +43,10 @@ export const calculateDurationDays = (start, end) => {
 };
 
 export default function ReservasiPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [viewMode, setViewMode] = useState(() => searchParams.get("view") || "timeline");
+  const [allReservations, setAllReservations] = useState([]);
+
   const [reservations, setReservations] = useState([]);
   const [clients, setClients] = useState([]);
   const [fleets, setFleets] = useState([]);
@@ -105,6 +113,18 @@ export default function ReservasiPage() {
     }
   };
 
+  // Fetch All Reservations for Gantt Timeline View
+  const fetchAllReservations = useCallback(async () => {
+    try {
+      const res = await request.get(API_ENDPOINTS.RESERVATIONS.LIST, { limit: 200, page: 1 });
+      if (res.success) {
+        setAllReservations(res.data || []);
+      }
+    } catch (err) {
+      console.error("Fetch all reservations error:", err);
+    }
+  }, []);
+
   // Fetch Reservations
   const fetchReservations = useCallback(async () => {
     setIsLoading(true);
@@ -138,13 +158,53 @@ export default function ReservasiPage() {
 
   useEffect(() => {
     fetchDropdownData();
-  }, []);
+    fetchAllReservations();
+  }, [fetchAllReservations]);
 
-  const handleOpenCreate = () => {
+  // Open Create modal with prefilled data if requested from URL query or Gantt click
+  useEffect(() => {
+    const isNew = searchParams.get("new");
+    const paramFleetId = searchParams.get("fleetId");
+    const paramDate = searchParams.get("date");
+    if (isNew && paramFleetId && paramDate && fleets.length > 0) {
+      const matchedFleet = fleets.find((f) => String(f.id) === String(paramFleetId));
+      handleOpenCreate({
+        fleet_id: paramFleetId,
+        usage_date: paramDate,
+        end_date: paramDate,
+        due_date: paramDate,
+        seat_count: matchedFleet ? matchedFleet.seat_capacity : 31,
+      });
+      searchParams.delete("new");
+      searchParams.delete("fleetId");
+      searchParams.delete("date");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, fleets]);
+
+  const handleOpenCreate = (prefillData = {}) => {
     setModalMode("create");
     setClientInputMode("existing");
-    setFormData(initialForm);
+    setFormData({
+      ...initialForm,
+      ...prefillData,
+    });
     setIsModalOpen(true);
+  };
+
+  const handleSelectEmptyDate = (fleet, dateStr) => {
+    handleOpenCreate({
+      fleet_id: fleet.id,
+      usage_date: dateStr,
+      end_date: dateStr,
+      due_date: dateStr,
+      seat_count: fleet.seat_capacity || 31,
+    });
+  };
+
+  const handleSelectReservation = (res) => {
+    setSelectedRes(res);
+    setIsDetailOpen(true);
   };
 
   const handleOpenEdit = (res) => {
@@ -206,6 +266,7 @@ export default function ReservasiPage() {
           setIsModalOpen(false);
           fetchDropdownData(); // refresh clients list
           fetchReservations();
+          fetchAllReservations();
         }
       } else {
         const res = await request.put(API_ENDPOINTS.RESERVATIONS.UPDATE(currentId), formData);
@@ -213,6 +274,7 @@ export default function ReservasiPage() {
           toast.success(res.message || "Reservasi berhasil diperbarui!");
           setIsModalOpen(false);
           fetchReservations();
+          fetchAllReservations();
         }
       }
     } catch (err) {
@@ -229,6 +291,7 @@ export default function ReservasiPage() {
       if (res.success) {
         toast.success(`Status diubah menjadi ${newStatus}`);
         fetchReservations();
+        fetchAllReservations();
       }
     } catch {
       toast.error("Gagal mengubah status.");
@@ -244,6 +307,7 @@ export default function ReservasiPage() {
         toast.success("Reservasi berhasil dihapus.");
         setIsDeleteDialogOpen(false);
         fetchReservations();
+        fetchAllReservations();
       }
     } catch {
       toast.error("Gagal menghapus reservasi.");
@@ -287,263 +351,298 @@ export default function ReservasiPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenCreate}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Tambah Reservasi
-        </button>
-      </div>
-
-      {/* Filter & Search Bar */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
-        <div className="w-full lg:w-72">
-          <SearchInput
-            value={search}
-            onChange={(val) => {
-              setSearch(val);
-              setPage(1);
-            }}
-            placeholder="Cari no. booking, tujuan, PIC, klien..."
-          />
-        </div>
-
-        {/* Date Filter with React Datepicker */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
-            <CalendarDays className="w-4 h-4 text-sky-600 flex-shrink-0" />
-            <DatePicker
-              selected={filterStartDate}
-              onChange={(date) => {
-                setFilterStartDate(date);
-                setPage(1);
-              }}
-              selectsStart
-              startDate={filterStartDate}
-              endDate={filterEndDate}
-              placeholderText="Dari tgl..."
-              dateFormat="dd/MM/yyyy"
-              className="w-20 bg-transparent outline-none text-xs text-slate-800 placeholder:text-slate-400 font-medium"
-            />
-            <span className="text-slate-400 font-bold">-</span>
-            <DatePicker
-              selected={filterEndDate}
-              onChange={(date) => {
-                setFilterEndDate(date);
-                setPage(1);
-              }}
-              selectsEnd
-              startDate={filterStartDate}
-              endDate={filterEndDate}
-              minDate={filterStartDate}
-              placeholderText="Sampai tgl..."
-              dateFormat="dd/MM/yyyy"
-              className="w-20 bg-transparent outline-none text-xs text-slate-800 placeholder:text-slate-400 font-medium"
-            />
-            {(filterStartDate || filterEndDate) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setFilterStartDate(null);
-                  setFilterEndDate(null);
-                  setPage(1);
-                }}
-                className="ml-1 text-slate-400 hover:text-rose-600 transition-colors text-xs font-bold"
-                title="Reset Filter Tanggal"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Filter Status Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
-          {["", "Booking", "DP", "LUNAS", "BATAL"].map((st) => (
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* View Mode Switcher */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60 shadow-2xs">
             <button
-              key={st}
               type="button"
               onClick={() => {
-                setStatusFilter(st);
-                setPage(1);
+                setViewMode("table");
+                setSearchParams({ view: "table" }, { replace: true });
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
-                statusFilter === st
-                  ? "bg-brand-600 text-white shadow-xs"
-                  : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === "table"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              {st === "" ? "Semua Status" : st}
+              <Table className="w-3.5 h-3.5" />
+              <span>Daftar Tabel</span>
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode("timeline");
+                setSearchParams({ view: "timeline" }, { replace: true });
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === "timeline"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <CalendarRange className="w-3.5 h-3.5" />
+              <span>Timeline Bulanan (Gantt)</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleOpenCreate()}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-xs transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Tambah Reservasi
+          </button>
         </div>
       </div>
 
-      {/* Table Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50 text-slate-600 border-b border-slate-100">
-              <tr>
-                <th className="py-3.5 px-4 font-semibold">No. Booking</th>
-                <th className="py-3.5 px-4 font-semibold">Klien & PIC</th>
-                <th className="py-3.5 px-4 font-semibold">Armada & Rute</th>
-                <th className="py-3.5 px-4 font-semibold">Jadwal Berangkat - Pulang</th>
-                <th className="py-3.5 px-4 font-semibold text-right">Harga & DP</th>
-                <th className="py-3.5 px-4 font-semibold text-center">Status</th>
-                <th className="py-3.5 px-4 font-semibold text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-600 mb-2" />
-                    Memuat data reservasi...
-                  </td>
-                </tr>
-              ) : reservations.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    Tidak ditemukan data reservasi yang sesuai.
-                  </td>
-                </tr>
-              ) : (
-                reservations.map((r) => {
-                  const badge = getStatusBadge(r.status);
-                  return (
-                    <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <span className="font-mono font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded text-xs">
-                          {r.reservation_number}
-                        </span>
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          {formatTanggal(r.created_at)}
-                        </p>
-                      </td>
+      {viewMode === "timeline" ? (
+        <ReservationGanttTimeline
+          fleets={fleets}
+          reservations={allReservations.length > 0 ? allReservations : reservations}
+          onSelectEmptyDate={handleSelectEmptyDate}
+          onSelectReservation={handleSelectReservation}
+          isLoading={isLoading}
+        />
+      ) : (
+        <>
+          {/* Filter & Search Bar */}
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
+            <div className="w-full lg:w-72">
+              <SearchInput
+                value={search}
+                onChange={(val) => {
+                  setSearch(val);
+                  setPage(1);
+                }}
+                placeholder="Cari no. booking, tujuan, PIC, klien..."
+              />
+            </div>
 
-                      <td className="py-3.5 px-4">
-                        <p className="font-bold text-slate-900">{r.client_name}</p>
-                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                          <User className="w-3 h-3 text-slate-400" />
-                          {r.pic_name} ({r.pic_phone})
-                        </p>
-                      </td>
+            {/* Date Filter with React Datepicker */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
+                <CalendarDays className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                <DatePicker
+                  selected={filterStartDate}
+                  onChange={(date) => {
+                    setFilterStartDate(date);
+                    setPage(1);
+                  }}
+                  selectsStart
+                  startDate={filterStartDate}
+                  endDate={filterEndDate}
+                  placeholderText="Tgl Mulai"
+                  dateFormat="dd/MM/yyyy"
+                  className="bg-transparent border-none outline-none w-24 text-xs"
+                />
+                <span className="text-slate-400">-</span>
+                <DatePicker
+                  selected={filterEndDate}
+                  onChange={(date) => {
+                    setFilterEndDate(date);
+                    setPage(1);
+                  }}
+                  selectsEnd
+                  startDate={filterStartDate}
+                  endDate={filterEndDate}
+                  minDate={filterStartDate}
+                  placeholderText="Tgl Selesai"
+                  dateFormat="dd/MM/yyyy"
+                  className="bg-transparent border-none outline-none w-24 text-xs"
+                />
+              </div>
 
-                      <td className="py-3.5 px-4">
-                        <p className="font-semibold text-slate-800">
-                          {r.fleet_name} <span className="text-slate-400 font-normal">({r.seat_count} Seat)</span>
-                        </p>
-                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3 text-slate-400" />
-                          <span className="truncate max-w-[200px]">{r.destination}</span>
-                        </p>
-                      </td>
+              {/* Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-brand-500 font-medium"
+              >
+                <option value="">Semua Status</option>
+                <option value="Booking">Booking</option>
+                <option value="DP">DP</option>
+                <option value="LUNAS">LUNAS</option>
+                <option value="Selesai">Selesai</option>
+                <option value="Batal">Batal</option>
+              </select>
 
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-900 text-xs">
-                          <span className="text-[10px] uppercase font-bold text-sky-600 mr-1">Berangkat:</span>
-                          {formatTanggal(r.usage_date)}
-                        </div>
-                        <div className="font-semibold text-slate-700 text-xs mt-0.5">
-                          <span className="text-[10px] uppercase font-bold text-sky-600 mr-1">Pulang:</span>
-                          {formatTanggal(r.end_date || r.usage_date)}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md">
-                            ⏱️ {calculateDurationDays(r.usage_date, r.end_date)} Hari
-                          </span>
-                          <span className="text-[11px] text-slate-400 flex items-center gap-0.5">
-                            <Clock className="w-3 h-3 text-slate-400" />
-                            {r.pickup_time || "07:00"}
-                          </span>
-                        </div>
-                      </td>
+              {(search || statusFilter || filterStartDate || filterEndDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setStatusFilter("");
+                    setFilterStartDate(null);
+                    setFilterEndDate(null);
+                    setPage(1);
+                  }}
+                  className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1"
+                >
+                  Reset Filter
+                </button>
+              )}
+            </div>
+          </div>
 
-                      <td className="py-3.5 px-4 text-right">
-                        <p className="font-mono font-bold text-slate-900">
-                          {formatRupiah(r.total_price)}
-                        </p>
-                        <p className="text-[11px] font-mono text-emerald-600 mt-0.5">
-                          DP: {formatRupiah(r.down_payment)}
-                        </p>
-                        {Number(r.remaining_payment) > 0 && (
-                          <p className="text-[11px] font-mono text-rose-600">
-                            Sisa: {formatRupiah(r.remaining_payment)}
-                          </p>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center">
-                        <select
-                          value={r.status}
-                          onChange={(e) => handleQuickStatus(r.id, e.target.value)}
-                          className={`text-xs font-semibold rounded-lg px-2.5 py-1 border cursor-pointer focus:outline-none ${badge.bg}`}
-                        >
-                          <option value="Booking">Booking</option>
-                          <option value="DP">DP</option>
-                          <option value="LUNAS">LUNAS</option>
-                          <option value="BATAL">BATAL</option>
-                        </select>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedRes(r);
-                              setIsDetailOpen(true);
-                            }}
-                            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                            title="Detail Reservasi"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(r)}
-                            className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
-                            title="Edit Reservasi"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDeleteTargetId(r.id);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                            className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
-                            title="Hapus Reservasi"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+          {/* Table Container */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead className="bg-slate-50 text-slate-600 border-b border-slate-100 font-semibold">
+                  <tr>
+                    <th className="py-3.5 px-4">No. Booking</th>
+                    <th className="py-3.5 px-4">Klien & PIC</th>
+                    <th className="py-3.5 px-4">Armada & Rute</th>
+                    <th className="py-3.5 px-4">Jadwal Pakai</th>
+                    <th className="py-3.5 px-4 text-right">Total Biaya</th>
+                    <th className="py-3.5 px-4 text-center">Status</th>
+                    <th className="py-3.5 px-4 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-brand-600" />
+                        <p className="text-xs">Memuat data reservasi...</p>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                  ) : reservations.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                        Tidak ada data reservasi ditemukan.
+                      </td>
+                    </tr>
+                  ) : (
+                    reservations.map((r) => {
+                      const badge = getStatusBadge(r.status);
+                      return (
+                        <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3 px-4 font-mono font-medium text-slate-800">
+                            {r.reservation_number}
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-bold text-slate-900">{r.client_name}</p>
+                            <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <User className="w-3 h-3" />
+                              PIC: {r.pic_name} ({r.pic_phone})
+                            </p>
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-semibold text-slate-800">{r.fleet_name}</p>
+                            <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <MapPin className="w-3 h-3 text-slate-400" />
+                              {r.destination}
+                            </p>
+                          </td>
+                          <td className="py-3 px-4 text-slate-600 text-xs">
+                            <div className="font-medium text-slate-900">
+                              {formatTanggal(r.usage_date)}
+                            </div>
+                            {r.end_date && r.end_date !== r.usage_date && (
+                              <div className="text-[11px] text-slate-500">
+                                s/d {formatTanggal(r.end_date)}
+                              </div>
+                            )}
+                            <span className="inline-block mt-0.5 px-1.5 py-0.2 bg-slate-100 text-slate-600 text-[10px] font-semibold rounded">
+                              ⏱️ {calculateDurationDays(r.usage_date, r.end_date)} Hari
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono text-xs">
+                            <div className="font-bold text-slate-900">
+                              {formatRupiah(r.total_price)}
+                            </div>
+                            {Number(r.down_payment) > 0 && (
+                              <div className="text-[11px] text-emerald-600 font-medium">
+                                DP: {formatRupiah(r.down_payment)}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="inline-flex flex-col items-center gap-1">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.bg}`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`}></span>
+                                {badge.label}
+                              </span>
 
-        {/* Server-side Pagination */}
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          limit={limit}
-          onPageChange={setPage}
-          onLimitChange={(lim) => {
-            setLimit(lim);
-            setPage(1);
-          }}
-        />
-      </div>
+                              {/* Quick status dropdown */}
+                              <select
+                                value={r.status}
+                                onChange={(e) => handleQuickStatus(r.id, e.target.value)}
+                                className="text-[10px] text-slate-500 border border-slate-200 rounded px-1.5 py-0.5 bg-white cursor-pointer hover:border-slate-300"
+                              >
+                                <option value="Booking">Booking</option>
+                                <option value="DP">DP</option>
+                                <option value="LUNAS">LUNAS</option>
+                                <option value="Selesai">Selesai</option>
+                                <option value="Batal">Batal</option>
+                              </select>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedRes(r);
+                                  setIsDetailOpen(true);
+                                }}
+                                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
+                                title="Detail Reservasi"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(r)}
+                                className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                title="Edit Reservasi"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeleteTargetId(r.id);
+                                  setIsDeleteDialogOpen(true);
+                                }}
+                                className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                title="Hapus Reservasi"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Server-side Pagination */}
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              limit={limit}
+              onPageChange={setPage}
+              onLimitChange={(lim) => {
+                setLimit(lim);
+                setPage(1);
+              }}
+            />
+          </div>
+        </>
+      )}
 
       {/* Modal Create / Edit Reservasi */}
       <Modal

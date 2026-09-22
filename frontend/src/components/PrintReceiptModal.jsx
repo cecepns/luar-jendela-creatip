@@ -310,10 +310,10 @@ Terima kasih atas kerjasamanya.`;
                   </div>
                 </div>
 
-                {/* Uang Sejumlah (Say / Terbilang) - Clean Slate design per client request */}
+                {/* Uang Sejumlah (Terbilang) - Clean design per client request */}
                 <div style={{ display: "flex", backgroundColor: "#f8fafc", borderBottom: "1px solid #cbd5e1", padding: "10px 12px", alignItems: "flex-start", color: "#0f172a" }}>
                   <div style={{ width: "150px", fontWeight: "bold", color: "#334155", fontSize: "11px", flexShrink: 0 }}>
-                    Uang Sejumlah (Say)
+                    Uang Sejumlah
                   </div>
                   <div style={{ fontStyle: "italic", fontWeight: "bold", fontSize: "11.5px", lineHeight: "1.3", color: "#0f172a" }}>
                     : {receipt.spell_out || "-"}
@@ -321,22 +321,12 @@ Terima kasih atas kerjasamanya.`;
                 </div>
 
                 {/* Untuk Pembayaran */}
-                <div style={{ display: "flex", borderBottom: "1px solid #cbd5e1", padding: "9px 12px", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", borderBottom: "1px solid #64748b", padding: "9px 12px", alignItems: "flex-start" }}>
                   <div style={{ width: "150px", fontStyle: "italic", fontWeight: "bold", color: "#475569", flexShrink: 0 }}>
                     Untuk Pembayaran
                   </div>
                   <div style={{ color: "#0f172a", fontWeight: "600" }}>
                     : {receipt.payment_for || "Sewa Bus Pariwisata"}
-                  </div>
-                </div>
-
-                {/* Metode Pembayaran */}
-                <div style={{ display: "flex", borderBottom: "1px solid #64748b", padding: "8px 12px", backgroundColor: "#ffffff" }}>
-                  <div style={{ width: "150px", fontStyle: "italic", fontWeight: "bold", color: "#475569", flexShrink: 0 }}>
-                    Metode Pembayaran
-                  </div>
-                  <div style={{ color: "#334155", fontWeight: "500" }}>
-                    : {receipt.payment_method || "Transfer Bank / Midtrans"}
                   </div>
                 </div>
 
@@ -401,7 +391,7 @@ Terima kasih atas kerjasamanya.`;
                   <div style={{ fontSize: "9px", color: "#64748b" }}>
                     <div style={{ color: "#166534", fontWeight: "bold", display: "flex", alignItems: "center", gap: "3px" }}>
                       <CheckCircle2 style={{ width: "12px", height: "12px", display: "inline" }} />
-                      <span>Kwitansi Sah Terverifikasi</span>
+                      <span>Kuitansi Sah Terverifikasi</span>
                     </div>
                     <div style={{ marginTop: "2px" }}>Scan QR untuk validasi keabsahan dokumen</div>
                   </div>

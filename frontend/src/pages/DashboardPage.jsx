@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CalendarDays,
+  CalendarRange,
   Bus,
   ReceiptText,
   DollarSign,
@@ -17,6 +18,7 @@ import { request } from "@/utils/request";
 import { API_ENDPOINTS } from "@/utils/endpoints";
 import { formatRupiah, formatTanggal, getStatusBadge } from "@/utils/formatters";
 import H2NotificationModal from "@/components/H2NotificationModal";
+import ReservationGanttTimeline from "@/components/ReservationGanttTimeline";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -29,6 +31,8 @@ export default function DashboardPage() {
   });
   const [h2List, setH2List] = useState([]);
   const [recentReservations, setRecentReservations] = useState([]);
+  const [fleets, setFleets] = useState([]);
+  const [allReservations, setAllReservations] = useState([]);
   const [isH2ModalOpen, setIsH2ModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -57,6 +61,14 @@ export default function DashboardPage() {
       if (resRes.success) {
         setRecentReservations(resRes.data || []);
       }
+
+      // 4. Fetch Fleets and All Reservations for Gantt Timeline
+      const [fleetsRes, allRes] = await Promise.all([
+        request.get(API_ENDPOINTS.FLEETS.ALL),
+        request.get(API_ENDPOINTS.RESERVATIONS.LIST, { limit: 200, page: 1 }),
+      ]);
+      if (fleetsRes.success) setFleets(fleetsRes.data || []);
+      if (allRes.success) setAllReservations(allRes.data || []);
     } catch (error) {
       console.error("Dashboard data fetch error:", error);
     } finally {
@@ -195,6 +207,42 @@ export default function DashboardPage() {
           </p>
           <span className="text-[11px] text-slate-500 mt-1 block">Belum Lunas / DP</span>
         </div>
+      </div>
+
+      {/* Monthly Timeline & Fleet Availability (Gantt Chart) */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+              <CalendarRange className="w-5 h-5 text-brand-600" />
+              <span>Timeline Ketersediaan Armada Bulan Ini</span>
+            </h2>
+            <p className="text-xs text-slate-500">
+              Pantau jadwal sewa seluruh armada secara realtime, klik kotak putih untuk sewa langsung
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate("/reservasi?view=timeline")}
+            className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+          >
+            Buka Menu Reservasi
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <ReservationGanttTimeline
+          fleets={fleets}
+          reservations={allReservations}
+          onSelectEmptyDate={(fleet, dateStr) => {
+            navigate(`/reservasi?new=1&fleetId=${fleet.id}&date=${dateStr}&view=timeline`);
+          }}
+          onSelectReservation={(res) => {
+            navigate(`/reservasi?view=table`);
+          }}
+          isLoading={isLoading}
+        />
       </div>
 
       {/* Recent Reservations Table */}
