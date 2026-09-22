@@ -351,7 +351,7 @@ export default function ReservasiPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
           {/* View Mode Switcher */}
           <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60 shadow-2xs">
             <button
@@ -360,7 +360,7 @@ export default function ReservasiPage() {
                 setViewMode("table");
                 setSearchParams({ view: "table" }, { replace: true });
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 viewMode === "table"
                   ? "bg-white text-slate-900 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -375,24 +375,24 @@ export default function ReservasiPage() {
                 setViewMode("timeline");
                 setSearchParams({ view: "timeline" }, { replace: true });
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 viewMode === "timeline"
                   ? "bg-white text-slate-900 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <CalendarRange className="w-3.5 h-3.5" />
-              <span>Timeline Bulanan (Gantt)</span>
+              <span>Timeline Bulanan</span>
             </button>
           </div>
 
           <button
             type="button"
             onClick={() => handleOpenCreate()}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-xs transition-all cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-xs transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            Tambah Reservasi
+            <span>Tambah Reservasi</span>
           </button>
         </div>
       </div>
