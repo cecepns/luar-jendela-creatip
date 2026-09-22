@@ -99,8 +99,12 @@ export default function ReservasiPage() {
   };
   const [formData, setFormData] = useState(initialForm);
 
+  const [isFleetsLoading, setIsFleetsLoading] = useState(true);
+  const [isAllResLoading, setIsAllResLoading] = useState(true);
+
   // Fetch dropdown options for Client and Fleets
   const fetchDropdownData = async () => {
+    setIsFleetsLoading(true);
     try {
       const [cRes, fRes] = await Promise.all([
         request.get(API_ENDPOINTS.CLIENTS.ALL),
@@ -110,11 +114,14 @@ export default function ReservasiPage() {
       if (fRes.success) setFleets(fRes.data || []);
     } catch (err) {
       console.error("Dropdown fetch error:", err);
+    } finally {
+      setIsFleetsLoading(false);
     }
   };
 
   // Fetch All Reservations for Gantt Timeline View
   const fetchAllReservations = useCallback(async () => {
+    setIsAllResLoading(true);
     try {
       const res = await request.get(API_ENDPOINTS.RESERVATIONS.LIST, { limit: 200, page: 1 });
       if (res.success) {
@@ -122,6 +129,8 @@ export default function ReservasiPage() {
       }
     } catch (err) {
       console.error("Fetch all reservations error:", err);
+    } finally {
+      setIsAllResLoading(false);
     }
   }, []);
 
@@ -403,7 +412,7 @@ export default function ReservasiPage() {
           reservations={allReservations.length > 0 ? allReservations : reservations}
           onSelectEmptyDate={handleSelectEmptyDate}
           onSelectReservation={handleSelectReservation}
-          isLoading={isLoading}
+          isLoading={isFleetsLoading || isAllResLoading}
         />
       ) : (
         <>

@@ -11,6 +11,7 @@ import {
   Clock,
   Info,
   Compass,
+  Loader2,
 } from "lucide-react";
 import { formatRupiah, formatTanggalShort } from "@/utils/formatters";
 
@@ -367,13 +368,57 @@ export default function ReservationGanttTimeline({
 
           {/* Table Body: Fleet Rows */}
           <tbody className="divide-y divide-slate-100">
-            {fleets.length === 0 ? (
+            {isLoading ? (
+              // Skeleton Loading State: Clean, responsive placeholders matching the Gantt structure
+              Array.from({ length: 4 }).map((_, idx) => (
+                <tr key={`skeleton-fleet-${idx}`} className="animate-pulse">
+                  {/* Sticky Armada Skeleton Column */}
+                  <td className="sticky left-0 z-10 bg-white border-r border-slate-200 p-2 sm:p-2.5 w-[105px] sm:w-[220px] min-w-[105px] sm:min-w-[220px] max-w-[110px] sm:max-w-[240px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">
+                    <div className="flex items-center gap-1.5 sm:gap-2.5">
+                      <div className="hidden sm:block w-8 h-8 rounded-xl bg-slate-200 shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="h-3 sm:h-3.5 bg-slate-200 rounded w-16 sm:w-28" />
+                        <div className="h-2 sm:h-2.5 bg-slate-100 rounded w-12 sm:w-20" />
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Day Skeleton Cells */}
+                  {daysInMonth.map((day, dIdx) => {
+                    // Simulated timeline blocks for realistic loading perception
+                    const hasSimulatedBar =
+                      (idx === 0 && dIdx >= 14 && dIdx <= 17) ||
+                      (idx === 1 && dIdx >= 5 && dIdx <= 7) ||
+                      (idx === 2 && dIdx >= 21 && dIdx <= 24);
+
+                    return (
+                      <td
+                        key={day.dateStr}
+                        className={`p-0 border-r border-slate-200/50 align-middle w-[35px] sm:w-[42px] min-w-[35px] sm:min-w-[42px] ${
+                          day.isWeekend ? "bg-slate-50/50" : "bg-white"
+                        }`}
+                      >
+                        <div className="h-9 sm:h-10 flex items-center justify-center px-0.5 sm:px-1">
+                          {hasSimulatedBar ? (
+                            <div className="w-full h-7 sm:h-8 rounded bg-slate-200/80" />
+                          ) : (
+                            <div className="w-1.5 h-1.5 rounded-full bg-slate-100" />
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            ) : fleets.length === 0 ? (
               <tr>
                 <td
                   colSpan={daysInMonth.length + 1}
                   className="py-12 text-center text-slate-400 text-xs"
                 >
-                  Tidak ada data armada yang tersedia.
+                  <Bus className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="font-semibold text-slate-600">Tidak ada armada yang terdaftar.</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Silakan tambahkan data armada terlebih dahulu di menu Armada.</p>
                 </td>
               </tr>
             ) : (
@@ -496,13 +541,28 @@ export default function ReservationGanttTimeline({
       {/* ===== FOOTER INSTRUCTION & SUMMARY ===== */}
       <div className="p-2.5 sm:p-4 bg-slate-50 border-t border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between text-[11px] sm:text-xs text-slate-500 gap-1.5 sm:gap-2">
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-600 shrink-0" />
-          <span>
-            <strong className="text-slate-700">Tips:</strong> Klik kotak putih untuk input sewa baru. Arahkan kursor / tap balok untuk info cepat.
-          </span>
+          {isLoading ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-600 animate-spin shrink-0" />
+              <span className="font-semibold text-brand-700">
+                Memuat data ketersediaan armada & jadwal reservasi...
+              </span>
+            </>
+          ) : (
+            <>
+              <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-600 shrink-0" />
+              <span>
+                <strong className="text-slate-700">Tips:</strong> Klik kotak putih untuk input sewa baru. Arahkan kursor / tap balok untuk info cepat.
+              </span>
+            </>
+          )}
         </div>
         <div className="text-[10px] sm:text-[11px] text-slate-600 font-medium">
-          Total {fleets.length} Armada • {monthlyStats.activeReservationsCount} Reservasi di {NAMA_BULAN[viewMonth]} {viewYear}
+          {isLoading ? (
+            <span className="inline-block w-28 h-3 bg-slate-200 rounded animate-pulse" />
+          ) : (
+            `Total ${fleets.length} Armada • ${monthlyStats.activeReservationsCount} Reservasi di ${NAMA_BULAN[viewMonth]} ${viewYear}`
+          )}
         </div>
       </div>
 

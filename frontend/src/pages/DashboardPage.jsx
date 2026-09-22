@@ -241,7 +241,7 @@ export default function DashboardPage() {
           onSelectReservation={(res) => {
             navigate(`/reservasi?view=table`);
           }}
-          isLoading={isLoading}
+          isLoading={isLoading || fleets.length === 0}
         />
       </div>
 
