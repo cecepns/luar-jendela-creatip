@@ -67,11 +67,20 @@ export default function PrintInvoiceModal({
     setIsGeneratingPdf(true);
     const toastId = toast.loading("Sedang menyusun file PDF Invoice...");
 
+    const previousZoom = zoomMode;
     try {
+      // Force 100% full scale DOM before capture so html-to-image never captures a shrunk/zoomed bounding box
+      if (zoomMode !== "original") {
+        setZoomMode("original");
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+
       const cleanFileName = `Invoice_${invoice.invoice_number.replace(/[\/\\]/g, "-")}.pdf`;
       await exportElementToPdf(printAreaRef.current, cleanFileName, {
         orientation: "portrait",
-        margin: 6,
+        width: CANVAS_WIDTH,
+        height: printAreaRef.current.scrollHeight,
+        margin: 5,
         centerVertical: false,
       });
       toast.success("File PDF Invoice berhasil diunduh!", { id: toastId });
@@ -79,6 +88,7 @@ export default function PrintInvoiceModal({
       console.error("PDF generation error:", err);
       toast.error("Gagal membuat file PDF. Silakan coba lagi.", { id: toastId });
     } finally {
+      setZoomMode(previousZoom);
       setIsGeneratingPdf(false);
     }
   };
