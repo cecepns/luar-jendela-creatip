@@ -166,7 +166,7 @@ export default function LoginPage() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin"
+                  placeholder="Masukkan username atau email"
                   required
                   className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/30 text-slate-800 transition-all placeholder:text-slate-400 shadow-sm"
                 />
@@ -183,7 +183,7 @@ export default function LoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Masukkan kata sandi"
                   required
                   className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/30 text-slate-800 transition-all placeholder:text-slate-400 shadow-sm"
                 />
@@ -210,13 +210,6 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
-
-          {/* Quick Credential Hint */}
-          <div className="mt-6 pt-4 border-t border-white/20 text-center">
-            <p className="text-[11px] text-sky-200">
-              Demo Akses Default: <strong className="text-white">admin</strong> / <strong className="text-white">admin123</strong>
-            </p>
-          </div>
         </div>
       </div>
 

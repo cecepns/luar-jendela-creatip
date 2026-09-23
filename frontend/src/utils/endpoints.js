@@ -33,6 +33,13 @@ export const API_ENDPOINTS = {
   NOTIFICATIONS: {
     H2_REMINDERS: "/api/notifications/h2-reminders",
   },
+  USERS: {
+    LIST: "/api/users",
+    DETAIL: (id) => `/api/users/${id}`,
+    CREATE: "/api/users",
+    UPDATE: (id) => `/api/users/${id}`,
+    DELETE: (id) => `/api/users/${id}`,
+  },
   CLIENTS: {
     LIST: "/api/clients",
     ALL: "/api/clients/all",

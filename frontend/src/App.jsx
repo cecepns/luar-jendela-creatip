@@ -10,6 +10,7 @@ import ReservasiPage from "@/pages/ReservasiPage";
 import ArmadaPage from "@/pages/ArmadaPage";
 import InvoiceKwitansiPage from "@/pages/InvoiceKwitansiPage";
 import KlienPage from "@/pages/KlienPage";
+import PegawaiPage from "@/pages/PegawaiPage";
 import ProfilPage from "@/pages/ProfilPage";
 import VerifyPage from "@/pages/VerifyPage";
 import { request } from "@/utils/request";
@@ -144,6 +145,7 @@ export default function App() {
                   <Route path="/armada" element={<ArmadaPage />} />
                   <Route path="/invoice-kwitansi" element={<InvoiceKwitansiPage />} />
                   <Route path="/klien" element={<KlienPage />} />
+                  <Route path="/pegawai" element={<PegawaiPage />} />
                   <Route path="/profil" element={<ProfilPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

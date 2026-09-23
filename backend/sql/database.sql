@@ -4,14 +4,16 @@
 CREATE DATABASE IF NOT EXISTS `luar_jendela_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `luar_jendela_db`;
 
--- 1. Tabel Users (Admin)
+-- 1. Tabel Users (Pegawai & Admin)
 CREATE TABLE IF NOT EXISTS `users` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(100) NOT NULL,
   `username` VARCHAR(50) NOT NULL UNIQUE,
   `email` VARCHAR(100) NOT NULL UNIQUE,
+  `phone` VARCHAR(30) NULL,
   `password` VARCHAR(255) NOT NULL,
   `role` VARCHAR(20) DEFAULT 'admin',
+  `status` ENUM('aktif', 'nonaktif') NOT NULL DEFAULT 'aktif',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -133,8 +135,10 @@ CREATE TABLE IF NOT EXISTS `receipts` (
 
 -- Admin user (Default: admin / admin123)
 -- Hash bcrypt untuk 'admin123' adalah $2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi
-INSERT IGNORE INTO `users` (`id`, `name`, `username`, `email`, `password`, `role`)
-VALUES (1, 'Admin Luar Jendela', 'admin', 'admin@luarjendelacreatip.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin');
+INSERT IGNORE INTO `users` (`id`, `name`, `username`, `email`, `phone`, `password`, `role`, `status`)
+VALUES 
+(1, 'Admin Luar Jendela', 'admin', 'admin@luarjendelacreatip.com', '085693499915', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'aktif'),
+(2, 'Staff Operasional', 'staff', 'staff@luarjendelacreatip.com', '081234567890', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff', 'aktif');
 
 -- Profil Perusahaan Default
 INSERT IGNORE INTO `company_profile` (`id`, `company_name`, `tagline`, `address`, `phone`, `email`, `website`, `bank_name`, `bank_account_no`, `bank_account_holder`, `signer_name`, `signer_title`)

@@ -6,6 +6,7 @@ import {
   Bus,
   ReceiptText,
   Users,
+  UserCheck,
   Building2,
   X,
   ChevronLeft,
@@ -38,6 +39,11 @@ const navItems = [
     name: "Data Klien",
     path: "/klien",
     icon: Users,
+  },
+  {
+    name: "Pegawai",
+    path: "/pegawai",
+    icon: UserCheck,
   },
   {
     name: "Profil Usaha",

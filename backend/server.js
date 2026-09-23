@@ -95,10 +95,11 @@ function terbilang(n) {
 
 // MySQL Database Connection Pool
 const pool = mysql.createPool({
-  host: "localhost",
-  user: "kinq6231_luar-jendela",
-  password: "kinq6231_luar-jendela",
-  database: "kinq6231_luar-jendela",
+  host: process.env.DB_HOST || "localhost",
+  user: process.env.DB_USER !== undefined ? process.env.DB_USER : "kinq6231_luar-jendela",
+  password: process.env.DB_PASSWORD !== undefined ? process.env.DB_PASSWORD : "kinq6231_luar-jendela",
+  database: process.env.DB_NAME || "kinq6231_luar-jendela",
+  port: Number(process.env.DB_PORT) || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -108,9 +109,9 @@ async function initDb() {
   try {
     const connection = await mysql.createConnection({
       host: process.env.DB_HOST || '127.0.0.1',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      port: process.env.DB_PORT || 3306
+      user: process.env.DB_USER !== undefined ? process.env.DB_USER : 'root',
+      password: process.env.DB_PASSWORD !== undefined ? process.env.DB_PASSWORD : '',
+      port: Number(process.env.DB_PORT) || 3306
     });
 
     await connection.query(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME || 'luar_jendela_db'}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
@@ -136,6 +137,22 @@ async function initDb() {
         }
       }
     }
+
+    // Safety migration check for users table (phone & status columns)
+    try {
+      const [userCols] = await pool.query("SHOW COLUMNS FROM users");
+      const colNames = userCols.map(c => c.Field);
+      if (!colNames.includes('phone')) {
+        await pool.query("ALTER TABLE users ADD COLUMN phone VARCHAR(30) NULL AFTER email");
+      }
+      if (!colNames.includes('status')) {
+        await pool.query("ALTER TABLE users ADD COLUMN status ENUM('aktif', 'nonaktif') NOT NULL DEFAULT 'aktif' AFTER role");
+        await pool.query("UPDATE users SET status = 'aktif' WHERE status IS NULL OR status = ''");
+      }
+    } catch (colErr) {
+      // ignore if table not ready yet
+    }
+
     console.log('✅ Connected to MySQL database successfully!');
   } catch (err) {
     console.error('❌ Critical MySQL connection error:', err.message);
@@ -194,6 +211,14 @@ app.post('/api/auth/login', async (req, res) => {
 
     const user = rows[0];
 
+    // Check account status
+    if (user.status === 'nonaktif') {
+      return res.status(403).json({
+        success: false,
+        message: 'Akun Anda dinonaktifkan. Silakan hubungi Administrator!'
+      });
+    }
+
     // Check password
     let validPassword = false;
     if (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) {
@@ -203,7 +228,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Default admin fallback
-    if (!validPassword && password === 'admin123') {
+    if (!validPassword && password === 'admin123' && user.username === 'admin') {
       validPassword = true;
     }
 
@@ -226,7 +251,9 @@ app.post('/api/auth/login', async (req, res) => {
         name: user.name,
         username: user.username,
         email: user.email,
-        role: user.role
+        phone: user.phone || '',
+        role: user.role,
+        status: user.status || 'aktif'
       }
     });
   } catch (error) {
@@ -237,7 +264,7 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/profile', authenticate, async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, name, username, email, role FROM users WHERE id = ?', [req.user.id]);
+    const [rows] = await pool.query('SELECT id, name, username, email, phone, role, status FROM users WHERE id = ?', [req.user.id]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan.' });
     }
@@ -245,6 +272,287 @@ app.get('/api/auth/profile', authenticate, async (req, res) => {
     res.json({ success: true, user: rows[0] });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Gagal mengambil profil user.' });
+  }
+});
+
+/* ==========================================================
+   USERS / PEGAWAI MANAGEMENT ENDPOINTS (Strict MySQL)
+========================================================== */
+
+// 1. GET /api/users - List Pegawai with Pagination, Search, Filter & Sort
+app.get('/api/users', authenticate, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const offset = (page - 1) * limit;
+    const search = (req.query.search || '').trim();
+    const role = (req.query.role || '').trim();
+    const status = (req.query.status || '').trim();
+    const allowedSortCols = ['id', 'name', 'username', 'email', 'role', 'status', 'created_at'];
+    const sortBy = allowedSortCols.includes(req.query.sortBy) ? req.query.sortBy : 'created_at';
+    const sortOrder = (req.query.sortOrder || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    const whereConditions = [];
+    const queryParams = [];
+
+    if (search) {
+      whereConditions.push('(name LIKE ? OR username LIKE ? OR email LIKE ? OR phone LIKE ?)');
+      const searchParam = `%${search}%`;
+      queryParams.push(searchParam, searchParam, searchParam, searchParam);
+    }
+
+    if (role && role !== 'all') {
+      whereConditions.push('role = ?');
+      queryParams.push(role);
+    }
+
+    if (status && status !== 'all') {
+      whereConditions.push('status = ?');
+      queryParams.push(status);
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Total Count
+    const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM users ${whereClause}`, queryParams);
+    const total = countRows[0].total;
+
+    // Data Query (exclude password)
+    const sql = `
+      SELECT id, name, username, email, phone, role, status, created_at, updated_at
+      FROM users
+      ${whereClause}
+      ORDER BY ${sortBy} ${sortOrder}
+      LIMIT ? OFFSET ?
+    `;
+    const [rows] = await pool.query(sql, [...queryParams, limit, offset]);
+
+    return sendPaginatedResponse(res, rows, page, limit, total);
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ success: false, message: 'Gagal mengambil data pegawai.' });
+  }
+});
+
+// 2. GET /api/users/:id - Detail Pegawai
+app.get('/api/users/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query(
+      'SELECT id, name, username, email, phone, role, status, created_at, updated_at FROM users WHERE id = ?',
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Pegawai tidak ditemukan.' });
+    }
+    return res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Get user detail error:', error);
+    res.status(500).json({ success: false, message: 'Gagal mengambil data pegawai.' });
+  }
+});
+
+// 3. POST /api/users - Tambah Pegawai Baru
+app.post('/api/users', authenticate, async (req, res) => {
+  try {
+    const { name, username, email, phone, password, role = 'staff', status = 'aktif' } = req.body;
+
+    if (!name || !username || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nama lengkap, username, email, dan kata sandi wajib diisi!'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Kata sandi minimal 6 karakter!'
+      });
+    }
+
+    // Check username or email uniqueness
+    const [existing] = await pool.query(
+      'SELECT id, username, email FROM users WHERE username = ? OR email = ? LIMIT 1',
+      [username.trim(), email.trim()]
+    );
+
+    if (existing.length > 0) {
+      if (existing[0].username.toLowerCase() === username.trim().toLowerCase()) {
+        return res.status(400).json({ success: false, message: 'Username sudah digunakan oleh pegawai lain!' });
+      }
+      if (existing[0].email.toLowerCase() === email.trim().toLowerCase()) {
+        return res.status(400).json({ success: false, message: 'Email sudah terdaftar pada akun lain!' });
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const cleanRole = ['admin', 'staff', 'driver', 'kasir'].includes(role) ? role : 'staff';
+    const cleanStatus = ['aktif', 'nonaktif'].includes(status) ? status : 'aktif';
+
+    const [result] = await pool.query(
+      `INSERT INTO users (name, username, email, phone, password, role, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [name.trim(), username.trim(), email.trim(), phone?.trim() || null, hashedPassword, cleanRole, cleanStatus]
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Pegawai berhasil ditambahkan!',
+      data: {
+        id: result.insertId,
+        name: name.trim(),
+        username: username.trim(),
+        email: email.trim(),
+        phone: phone?.trim() || null,
+        role: cleanRole,
+        status: cleanStatus
+      }
+    });
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({ success: false, message: 'Gagal menambahkan pegawai baru.' });
+  }
+});
+
+// 4. PUT /api/users/:id - Update Pegawai
+app.put('/api/users/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, username, email, phone, password, role, status } = req.body;
+
+    if (!name || !username || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nama lengkap, username, dan email wajib diisi!'
+      });
+    }
+
+    // Check user exists
+    const [targetRows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
+    if (targetRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Pegawai tidak ditemukan.' });
+    }
+    const currentTarget = targetRows[0];
+
+    // Check username or email uniqueness excluding current id
+    const [existing] = await pool.query(
+      'SELECT id, username, email FROM users WHERE (username = ? OR email = ?) AND id != ? LIMIT 1',
+      [username.trim(), email.trim(), id]
+    );
+
+    if (existing.length > 0) {
+      if (existing[0].username.toLowerCase() === username.trim().toLowerCase()) {
+        return res.status(400).json({ success: false, message: 'Username sudah digunakan oleh pegawai lain!' });
+      }
+      if (existing[0].email.toLowerCase() === email.trim().toLowerCase()) {
+        return res.status(400).json({ success: false, message: 'Email sudah terdaftar pada akun lain!' });
+      }
+    }
+
+    // Safety: Cannot deactivate own account while logged in
+    if (parseInt(req.user.id) === parseInt(id) && status === 'nonaktif') {
+      return res.status(400).json({
+        success: false,
+        message: 'Anda tidak dapat menonaktifkan akun Anda sendiri saat sedang digunakan!'
+      });
+    }
+
+    // Safety: If changing role away from admin or deactivating, verify there remains at least 1 active admin
+    if (currentTarget.role === 'admin' && (role !== 'admin' || status === 'nonaktif')) {
+      const [adminCount] = await pool.query(
+        "SELECT COUNT(*) as total FROM users WHERE role = 'admin' AND status = 'aktif' AND id != ?",
+        [id]
+      );
+      if (adminCount[0].total === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tidak dapat mengubah role atau menonaktifkan akun Administrator terakhir!'
+        });
+      }
+    }
+
+    const cleanRole = role ? (['admin', 'staff', 'driver', 'kasir'].includes(role) ? role : 'staff') : currentTarget.role;
+    const cleanStatus = status ? (['aktif', 'nonaktif'].includes(status) ? status : 'aktif') : currentTarget.status;
+
+    let updateSql = `
+      UPDATE users
+      SET name = ?, username = ?, email = ?, phone = ?, role = ?, status = ?
+    `;
+    const updateParams = [name.trim(), username.trim(), email.trim(), phone?.trim() || null, cleanRole, cleanStatus];
+
+    if (password && password.trim().length > 0) {
+      if (password.trim().length < 6) {
+        return res.status(400).json({ success: false, message: 'Kata sandi minimal 6 karakter!' });
+      }
+      const hashedPassword = await bcrypt.hash(password.trim(), 10);
+      updateSql += ', password = ?';
+      updateParams.push(hashedPassword);
+    }
+
+    updateSql += ' WHERE id = ?';
+    updateParams.push(id);
+
+    await pool.query(updateSql, updateParams);
+
+    return res.json({
+      success: true,
+      message: 'Data pegawai berhasil diperbarui!',
+      data: {
+        id: Number(id),
+        name: name.trim(),
+        username: username.trim(),
+        email: email.trim(),
+        phone: phone?.trim() || null,
+        role: cleanRole,
+        status: cleanStatus
+      }
+    });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ success: false, message: 'Gagal memperbarui data pegawai.' });
+  }
+});
+
+// 5. DELETE /api/users/:id - Hapus Pegawai
+app.delete('/api/users/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Safety 1: Cannot delete oneself
+    if (parseInt(req.user.id) === parseInt(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif digunakan!'
+      });
+    }
+
+    // Safety 2: Check user exists
+    const [targetRows] = await pool.query('SELECT id, name, role FROM users WHERE id = ?', [id]);
+    if (targetRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Pegawai tidak ditemukan.' });
+    }
+
+    // Safety 3: Cannot delete the last admin
+    if (targetRows[0].role === 'admin') {
+      const [adminCount] = await pool.query("SELECT COUNT(*) as total FROM users WHERE role = 'admin' AND id != ?", [id]);
+      if (adminCount[0].total === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tidak dapat menghapus akun Administrator satu-satunya dalam sistem!'
+        });
+      }
+    }
+
+    await pool.query('DELETE FROM users WHERE id = ?', [id]);
+
+    return res.json({
+      success: true,
+      message: `Pegawai "${targetRows[0].name}" berhasil dihapus!`
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ success: false, message: 'Gagal menghapus pegawai.' });
   }
 });
 
