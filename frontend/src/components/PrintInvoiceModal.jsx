@@ -662,37 +662,86 @@ Mohon konfirmasi setelah pembayaran. Terima kasih atas kerjasamanya.`;
                 </table>
               </div>
 
-              {/* ===== 6. SYARAT & KETENTUAN (15 Points) ===== */}
+              {/* ===== 6. SYARAT & KETENTUAN (16 Points) ===== */}
               <div
                 style={{
                   border: "1px solid #cbd5e1",
                   borderRadius: "2px",
-                  padding: "7px 12px",
-                  fontSize: "8.5px",
-                  lineHeight: "1.35",
-                  marginBottom: "12px",
+                  padding: "6px 12px",
+                  fontSize: "8px",
+                  lineHeight: "1.32",
+                  marginBottom: "10px",
                 }}
               >
-                <div style={{ fontWeight: "bold", color: "#0f172a", marginBottom: "4px" }}>
-                  Syarat & Ketentuan :
+                <div style={{ fontWeight: "bold", color: "#0f172a", marginBottom: "4px", fontSize: "9px" }}>
+                  Syarat dan Ketentuan :
                 </div>
                 <table style={{ borderCollapse: "collapse", width: "100%", color: "#334155" }}>
                   <tbody>
-                    <tr><td style={{ width: "18px", verticalAlign: "top" }}>1.</td><td>Harga SUDAH TERMASUK biaya bahan bakar dan jasa supir</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>2.</td><td>Harga BELUM TERMASUK biaya tol, parkir, makan crew, retribusi jalan, akomodasi/penginapan kru bus (bila menginap), TIP pengemudi</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>3.</td><td>Pemesanan baru DIANGGAP SAH apabila sudah melakukan pembayaran uang muka, pembayaran uang muka minimum 50% dari total</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>4.</td><td>Pembayaran sewa harus lunas 3 hari sebelum keberangkatan</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>5.</td><td>Uang sewa / DP tidak dapat dikembalikan apabila terjadi pembatalan (hangus)</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>6.</td><td>Pembatalan 3 hari sebelum keberangkatan dikenakan cancelation fee 100% dari harga</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>7.</td><td>Kehilangan barang / tertukar di dalam bus bukan tanggung jawab pengelola bus dan kru</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>8.</td><td>Pengemudi berhak menolak jalan yang tidak memadai / dilarang petugas / membahayakan</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>9.</td><td>Perhitungan penggunaan bus 1 hari = Pukul 05.00 s/d Pukul 23.00</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>10.</td><td>Batas Pemakaian Bus (Dalam Kota) maksimum 12 Jam terhitung mulai dari jam penjemputan</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>11.</td><td>Batas Pemakaian Bus (Luar Kota) paling pagi pukul 05.00 sampai maksimum pukul 23.00</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>12.</td><td>Pemakaian melebihi 12 Jam (Dalam Kota) dan atau Melebihi pukul 23.00 (Luar Kota) dikenakan overtime charge</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>13.</td><td>Penyewa harus bertanggung jawab apabila merusak kendaraan / bus</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>14.</td><td>Penjemputan untuk area dalam kota Jakarta GRATIS</td></tr>
-                    <tr><td style={{ verticalAlign: "top" }}>15.</td><td>Penjemputan diluar area Jakarta yang tidak searah dikenakan charge sesuai jarak penjemputan.</td></tr>
+                    <tr>
+                      <td style={{ width: "18px", verticalAlign: "top" }}>1.</td>
+                      <td>Harga <strong style={{ fontWeight: "bold", color: "#0f172a" }}>SUDAH TERMASUK</strong> biaya bahan bakar dan jasa Pengemudi & asisten pengemudi.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>2.</td>
+                      <td>Harga <strong style={{ fontWeight: "bold", color: "#0f172a" }}>BELUM TERMASUK</strong> biaya tol, parkir, makan crew, retribusi jalan, penginapan crew bus (bila menginap), ferry penyebrangan (bila keluar Pulau Jawa), TIP pengemudi & asisten pengemudi.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>3.</td>
+                      <td>Pemesanan <strong style={{ fontWeight: "bold", color: "#0f172a" }}>DIANGGAP SAH</strong> apabila sudah melakukan pembayaran uang muka, pembayaran uang muka minimum 50% dari total harga sewa.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>4.</td>
+                      <td>Pembayaran sewa harus lunas 3 hari sebelum keberangkatan.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>5.</td>
+                      <td>Uang sewa / DP tidak dapat dikembalikan apabila terjadi pembatalan (hangus).</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>6.</td>
+                      <td>Pembatalan 7 hari sebelum keberangkatan dikenakan cancelation fee 50% dari harga sewa.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>7.</td>
+                      <td>Pembatalan 3 hari sebelum keberangkatan dikenakan cancelation fee 100% dari harga sewa.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>8.</td>
+                      <td>Kehilangan barang / tertukar di dalam bus bukan tanggung jawab pengelola bus dan crew.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>9.</td>
+                      <td>Pengemudi berhak menolak jalan yang tidak memadai / dilarang petugas / membahayakan.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>10.</td>
+                      <td>Perhitungan penggunaan bus 1 hari = Pukul 05.00 s/d Pukul 23.00.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>11.</td>
+                      <td>Batas Pemakaian Bus (Dalam Kota) maksimum 12 Jam terhitung mulai dari jam penjemputan.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>12.</td>
+                      <td>Batas Pemakaian Bus (Luar Kota) paling pagi pukul 05.00 sampai maksimum pukul 23.00.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>13.</td>
+                      <td>Pemakaian melebihi 12 Jam (Dalam Kota) dan atau Melebihi pukul 23.00 (Luar Kota) dikenakan overtime charge 10% per jam dari harga sewa.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>14.</td>
+                      <td>Penyewa harus bertanggung jawab apabila merusak kendaraan / bus.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>15.</td>
+                      <td>Penjemputan untuk area dalam kota Jakarta <strong style={{ fontWeight: "bold", color: "#0f172a" }}>GRATIS</strong>.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>16.</td>
+                      <td>Penjemputan diluar area Jakarta yang tidak searah dikenakan charge sesuai jarak penjemputan.</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>

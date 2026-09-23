@@ -5,10 +5,10 @@ import App from "./App.jsx";
 import "./index.css";
 
 // Auto register PWA service worker
-if ("serviceWorker" in navigator && !window.location.host.includes("localhost:5173")) {
+if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch((err) => {
-      console.log("ServiceWorker registration skipped or in dev mode:", err);
+      console.log("ServiceWorker registration:", err);
     });
   });
 }

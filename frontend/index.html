@@ -5,9 +5,23 @@
     <link rel="icon" type="image/png" href="/pwa-192x192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#0284c7" />
-    <meta name="description" content="Aplikasi Reservasi & Manajemen Armada Luar Jendela Creatip" />
+    <meta name="description" content="Aplikasi Reservasi Bus Pariwisata & Manajemen Armada Luar Jendela Creatrip" />
+    <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
-    <title>Luar Jendela Creatip - Rental Armada & Reservasi Wisata</title>
+    <title>Reservasi Bus Pariwisata - Luar Jendela Creatrip</title>
+    <script>
+      // Global PWA install prompt handler captured as early as possible
+      window.__deferredPwaPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__deferredPwaPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-prompt-ready'));
+      });
+      window.addEventListener('appinstalled', function () {
+        window.__deferredPwaPrompt = null;
+        window.dispatchEvent(new CustomEvent('pwa-app-installed'));
+      });
+    </script>
     <!-- Google Fonts Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
