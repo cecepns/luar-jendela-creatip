@@ -120,7 +120,7 @@ export default function VerifyPage() {
         </div>
 
         {/* Back Link */}
-        <div className="pt-4 border-t border-slate-100 text-center">
+        {/* <div className="pt-4 border-t border-slate-100 text-center">
           <Link
             to="/"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700"
@@ -128,7 +128,7 @@ export default function VerifyPage() {
             <ArrowLeft className="w-4 h-4" />
             Kembali ke Aplikasi
           </Link>
-        </div>
+        </div> */}
       </div>
     </div>
   );
